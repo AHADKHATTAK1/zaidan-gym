@@ -1,0 +1,1417 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#00C46C" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Members - {{ gym_name }}</title>
+    <script>
+      (function () {
+        try {
+          var th = localStorage.getItem("theme") || "light";
+          document.documentElement.setAttribute("data-bs-theme", th);
+        } catch (e) {}
+      })();
+    </script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/theme.css" />
+    <style>
+      /* Page-specific minor styles */
+      .badge-training { background: var(--light-grey); color: var(--charcoal); padding: 2px 6px; border-radius: 6px; font-size: .8rem; }
+    </style>
+  </head>
+  <body class="p-4">
+    <div class="container">
+      <nav class="navbar navbar-expand border rounded px-3 mb-3">
+        <a class="navbar-brand d-flex align-items-center gap-2" href="/dashboard">
+          {% if logo_url %}
+          <img src="{{ logo_url }}" alt="Logo" style="height:28px; width:auto; border-radius:4px" />
+          {% endif %}
+          <span class="brand">{{ gym_name }}</span>
+        </a>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <a class="btn btn-sm text-white" href="/dashboard">Dashboard</a>
+          <a class="btn btn-sm text-white" href="/fees">Fees</a>
+          <a class="btn btn-sm btn-outline-danger" href="/logout">Logout</a>
+        </div>
+      </nav>
+
+      <div class="row g-2 mb-3">
+          <button
+            class="btn btn-outline-primary w-100"
+            onclick="fetchMembers()"
+          >
+            Search
+          </button>
+        </div>
+        <div class="col-md-6 text-end">
+          <form
+            id="uploadForm"
+            enctype="multipart/form-data"
+            class="d-inline-flex gap-2 align-items-center"
+          >
+            <input
+              class="form-control form-control-sm"
+              type="file"
+              id="csvfile"
+              name="file"
+            />
+            <button class="btn btn-sm btn-outline-secondary" type="submit">
+              <i class="bi bi-upload"></i> Import CSV
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center justify-content-between">
+        <h3 class="mb-0">Add Member</h3>
+        <span class="text-muted small"
+          >Default: <span id="defaultFlagInline"></span> +{{ default_cc }}</span
+        >
+      </div>
+      <form id="addForm" class="mb-4" enctype="multipart/form-data">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-4">
+            <input required class="form-control" id="name" placeholder="Name" />
+          </div>
+          <div class="col-md-3">
+            <div class="input-group">
+              <span class="input-group-text" id="phoneFlag">🌐</span>
+              <input
+                class="form-control"
+                id="phone"
+                placeholder="Phone (auto +{{ default_cc }} if missing)"
+              />
+            </div>
+          </div>
+          <div class="col-md-2">
+            <input
+              required
+              class="form-control"
+              id="admission_date"
+              type="date"
+            />
+          </div>
+          <div class="col-md-2">
+            <div class="input-group">
+              <span class="input-group-text">Fee</span>
+              <input
+                class="form-control"
+                id="monthly_fee"
+                type="number"
+                step="0.01"
+                placeholder="Amount"
+              />
+            </div>
+          </div>
+          <div
+            class="col-md-1 form-check d-flex align-items-center gap-2 flex-wrap"
+          >
+            <input class="form-check-input" type="checkbox" id="init_paid" />
+            <label class="form-check-label" for="init_paid">Paid?</label>
+          </div>
+          <div class="col-md-2 d-flex gap-2 flex-wrap">
+            <input
+              type="file"
+              id="photo"
+              class="form-control form-control-sm"
+              accept="image/*"
+            />
+            <button
+              class="btn btn-outline-secondary"
+              type="button"
+              id="btnAddStartCam"
+              onclick="startAddCamera()"
+            >
+              <i class="bi bi-camera-video"></i>
+            </button>
+            <button class="btn btn-primary" type="submit">Add</button>
+          </div>
+        </div>
+        <div class="row g-2 mt-1 align-items-end">
+          <div class="col-md-3">
+            <select class="form-select" id="training_type">
+              <option value="standard">Gym</option>
+              <option value="personal">Personal Training</option>
+              <option value="cardio">Cardio</option>
+              <option value="other">Other (Custom)</option>
+            </select>
+          </div>
+          <div class="col-md-2 form-check d-flex align-items-center gap-2">
+            <input class="form-check-input" type="checkbox" id="special_tag" />
+            <label class="form-check-label" for="special_tag">Special</label>
+          </div>
+        </div>
+        <div class="row mt-2 d-none" id="addCamRow">
+          <div class="col-12">
+            <div class="border rounded p-2">
+              <div class="d-flex align-items-center gap-2">
+                <video
+                  id="addCamStream"
+                  class="d-none"
+                  autoplay
+                  playsinline
+                  style="max-height: 140px"
+                ></video>
+                <canvas
+                  id="addCamCanvas"
+                  class="d-none"
+                  style="max-height: 140px"
+                ></canvas>
+                <div class="ms-auto d-flex gap-2">
+                  <button
+                    class="btn btn-sm btn-secondary d-none"
+                    type="button"
+                    id="btnAddCapture"
+                    onclick="captureAddPhoto()"
+                  >
+                    <i class="bi bi-camera"></i> Capture
+                  </button>
+                  <button
+                    class="btn btn-sm btn-outline-danger d-none"
+                    type="button"
+                    id="btnAddStopCam"
+                    onclick="stopAddCamera()"
+                  >
+                    <i class="bi bi-x-circle"></i> Close
+                  </button>
+                </div>
+              </div>
+              <div class="small text-muted mt-1" id="addCaptureStatus"></div>
+            </div>
+          </div>
+        </div>
+        <div class="row g-2 mt-1" id="customTrainingRow" style="display: none">
+          <div class="col-md-3">
+            <input
+              class="form-control"
+              id="custom_training"
+              placeholder="Custom training type"
+            />
+          </div>
+        </div>
+      </form>
+
+      <h3 class="d-flex align-items-center justify-content-between">
+        <span>Members</span>
+        <div class="btn-group btn-group-sm" role="group">
+          <button type="button" id="toggleViewCards" class="btn btn-outline-secondary active" onclick="setMemberView('cards')"><i class="bi bi-grid"></i></button>
+          <button type="button" id="toggleViewTable" class="btn btn-outline-secondary" onclick="setMemberView('table')"><i class="bi bi-list"></i></button>
+        </div>
+      </h3>
+      <div class="row g-2 mb-3" id="memberFilters">
+        <div class="col-md-4">
+          <input id="search" class="form-control" placeholder="Search by name, phone or #serial" />
+        </div>
+        <div class="col-md-2">
+          <select id="filterStatus" class="form-select" onchange="debouncedFetchMembers()">
+            <option value="">All Status</option>
+            <option value="Paid">Paid</option>
+            <option value="Unpaid">Unpaid</option>
+            <option value="N/A">N/A</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select id="filterTraining" class="form-select" onchange="debouncedFetchMembers()">
+            <option value="">All Training</option>
+            <option value="standard">Standard</option>
+            <option value="personal">Personal</option>
+            <option value="cardio">Cardio</option>
+            <option value="other">Custom</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <select id="filterSpecial" class="form-select" onchange="debouncedFetchMembers()">
+            <option value="">Any Tag</option>
+            <option value="1">Special ⭐</option>
+            <option value="0">Not Special</option>
+          </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+          <button class="btn btn-outline-primary w-100" type="button" onclick="debouncedFetchMembers()"><i class="bi bi-search"></i> Apply</button>
+        </div>
+      </div>
+      <div id="members">
+        <div class="text-center py-4">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2 text-muted">Loading members...</p>
+        </div>
+      </div>
+      <hr />
+      <h4>Data File Upload (CSV / Excel)</h4>
+      <form
+        id="dataUploadForm"
+        class="d-flex gap-2 align-items-center mb-3"
+        enctype="multipart/form-data"
+      >
+        <input
+          type="file"
+          class="form-control"
+          id="dataFile"
+          name="file"
+          accept=".csv,.xlsx,.xls"
+        />
+        <button class="btn btn-outline-primary" type="submit">
+          <i class="bi bi-file-earmark-arrow-up"></i> Upload
+        </button>
+      </form>
+      <div class="small text-muted mb-2">
+        Duplicate file contents (same SHA-256) are rejected.
+      </div>
+      <div id="uploadStatus" class="mb-3"></div>
+      <div id="uploadsList" class="mb-4"></div>
+      <!-- Edit Member Modal -->
+      <div class="modal fade" id="editMemberModal" tabindex="-1">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Edit Member</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <form id="editMemberForm" class="vstack gap-3">
+                <input type="hidden" id="edit_id" />
+                <div>
+                  <label class="form-label">Name</label>
+                  <input class="form-control" id="edit_name" />
+                </div>
+                <div>
+                  <label class="form-label">Phone</label>
+                  <input class="form-control" id="edit_phone" />
+                </div>
+                <div>
+                  <label class="form-label">Admission Date</label>
+                  <input type="date" class="form-control" id="edit_admission" />
+                </div>
+                <div>
+                  <label class="form-label">Plan Type</label>
+                  <select class="form-select" id="edit_plan">
+                    <option value="monthly">Monthly</option>
+                    <option value="yearly">Yearly</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Access Tier</label>
+                  <select class="form-select" id="edit_access">
+                    <option value="standard">Standard</option>
+                    <option value="unlimited">Unlimited</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="form-label">Training Type</label>
+                  <select class="form-select" id="edit_training_type">
+                    <option value="standard">Gym</option>
+                    <option value="personal">Personal</option>
+                    <option value="cardio">Cardio</option>
+                    <option value="other">Other (Custom)</option>
+                  </select>
+                </div>
+                <div id="edit_custom_training_wrap" style="display: none">
+                  <label class="form-label">Custom Training</label>
+                  <input
+                    class="form-control"
+                    id="edit_custom_training"
+                    placeholder="e.g. CrossFit"
+                  />
+                </div>
+                <div>
+                  <label class="form-label">Monthly Fee (override)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    class="form-control"
+                    id="edit_monthly_fee"
+                    placeholder="Leave blank for default"
+                  />
+                </div>
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    id="edit_special_tag"
+                  />
+                  <label class="form-check-label" for="edit_special_tag"
+                    >Special Tag</label
+                  >
+                </div>
+                <div class="border rounded p-2">
+                  <label class="form-label">Photo (Camera)</label>
+                  <div class="d-flex flex-column gap-2">
+                    <video
+                      id="camStream"
+                      autoplay
+                      playsinline
+                      class="w-100 rounded border d-none"
+                      style="max-height: 240px"
+                    ></video>
+                    <canvas id="camCanvas" class="d-none"></canvas>
+                    <div class="d-flex gap-2">
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary"
+                        id="btnStartCam"
+                        onclick="startCamera()"
+                      >
+                        Start Camera
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary d-none"
+                        id="btnCapture"
+                        onclick="capturePhoto()"
+                      >
+                        Capture
+                      </button>
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-secondary d-none"
+                        id="btnStopCam"
+                        onclick="stopCamera()"
+                      >
+                        Stop
+                      </button>
+                    </div>
+                    <div id="captureStatus" class="small text-muted"></div>
+                  </div>
+                </div>
+              </form>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" data-bs-dismiss="modal">
+                Close
+              </button>
+              <button class="btn btn-primary" onclick="saveEdit()">
+                Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Member Details Modal -->
+      <div class="modal fade" id="memberDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Member Details</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Close"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <div id="md-basic" class="mb-3"></div>
+              <ul class="nav nav-tabs" role="tablist">
+                <li class="nav-item">
+                  <button
+                    class="nav-link active"
+                    data-bs-toggle="tab"
+                    data-bs-target="#tab-payments"
+                    type="button"
+                  >
+                    Payments
+                  </button>
+                </li>
+                <li class="nav-item">
+                  <button
+                    class="nav-link"
+                    data-bs-toggle="tab"
+                    data-bs-target="#tab-transactions"
+                    type="button"
+                  >
+                    Transactions
+                  </button>
+                </li>
+              </ul>
+              <div
+                class="tab-content border-start border-end border-bottom p-3"
+              >
+                <div class="tab-pane fade show active" id="tab-payments"></div>
+                <div class="tab-pane fade" id="tab-transactions"></div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" data-bs-dismiss="modal">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // Theme toggle
+      (function () {
+        var btn = document.getElementById("themeToggle");
+        if (btn) {
+          btn.addEventListener("click", function () {
+            var cur =
+              document.documentElement.getAttribute("data-bs-theme") || "dark";
+            var next = cur === "dark" ? "light" : "dark";
+            document.documentElement.setAttribute("data-bs-theme", next);
+            try {
+              localStorage.setItem("theme", next);
+            } catch (e) {}
+          });
+        }
+      })();
+
+      // Flags helpers
+      const DEFAULT_CC = "{{ default_cc }}";
+      const CC_TO_ISO = {
+        92: "PK",
+        91: "IN",
+        1: "US",
+        44: "GB",
+        971: "AE",
+        974: "QA",
+        966: "SA",
+        880: "BD",
+        977: "NP",
+        94: "LK",
+        60: "MY",
+        65: "SG",
+        61: "AU",
+        81: "JP",
+        49: "DE",
+        33: "FR",
+        39: "IT",
+        86: "CN",
+        7: "RU",
+        34: "ES",
+        351: "PT",
+        41: "CH",
+        31: "NL",
+        90: "TR",
+        20: "EG",
+        62: "ID",
+        63: "PH",
+        64: "NZ",
+        82: "KR",
+        55: "BR",
+        52: "MX",
+        27: "ZA",
+        972: "IL",
+        98: "IR",
+        964: "IQ",
+        965: "KW",
+        968: "OM",
+        973: "BH",
+        216: "TN",
+        213: "DZ",
+        254: "KE",
+        255: "TZ",
+        256: "UG",
+      };
+      function isoToFlag(iso) {
+        if (!iso) return "🌐";
+        const up = iso.toUpperCase();
+        return String.fromCodePoint(
+          ...[...up].map((c) => 127397 + c.charCodeAt(0))
+        );
+      }
+      function phoneToFlag(phone, defCC) {
+        if (!phone) {
+          return isoToFlag(CC_TO_ISO[defCC] || "");
+        }
+        let p = (phone || "").trim();
+        if (p.startsWith("+")) {
+          p = p.slice(1);
+          for (let len of [3, 2, 1]) {
+            const code = p.slice(0, len);
+            if (CC_TO_ISO[code]) return isoToFlag(CC_TO_ISO[code]);
+          }
+          return "🌐";
+        }
+        return isoToFlag(CC_TO_ISO[defCC] || "");
+      }
+      function updateDefaultFlags() {
+        const inline = document.getElementById("defaultFlagInline");
+        const nf = document.getElementById("defaultFlag");
+        const flag = isoToFlag(CC_TO_ISO[DEFAULT_CC] || "");
+        if (inline) inline.textContent = flag;
+        if (nf) nf.textContent = flag;
+      }
+      function updatePhoneFlag() {
+        const inp = document.getElementById("phone");
+        const span = document.getElementById("phoneFlag");
+        if (!inp || !span) return;
+        span.textContent = phoneToFlag(inp.value, DEFAULT_CC);
+      }
+
+      let memberView = sessionStorage.getItem('memberView') || 'cards';
+      function setMemberView(v){
+        memberView = v;
+        sessionStorage.setItem('memberView', v);
+        document.getElementById('toggleViewCards').classList.toggle('active', v==='cards');
+        document.getElementById('toggleViewTable').classList.toggle('active', v==='table');
+        fetchMembers();
+      }
+      let fetchMembersTimer;
+      function debouncedFetchMembers(){
+        clearTimeout(fetchMembersTimer);
+        fetchMembersTimer = setTimeout(fetchMembers, 300);
+      }
+      function applyClientFilters(data){
+        const status = document.getElementById('filterStatus')?.value || '';
+        const training = document.getElementById('filterTraining')?.value || '';
+        const special = document.getElementById('filterSpecial')?.value || '';
+        return data.filter(m => {
+          if (status && m.current_fee_status !== status) return false;
+          if (training){
+            if (training === 'other' && !(m.custom_training && m.custom_training.trim())) return false;
+            else if (training !== 'other' && (m.training_type !== training)) return false;
+          }
+            if (special !== ''){
+              const isSpecial = !!m.special_tag;
+              if ((special === '1' && !isSpecial) || (special === '0' && isSpecial)) return false;
+            }
+          return true;
+        });
+      }
+      async function fetchMembers() {
+        try {
+          const q = document.getElementById("search")?.value || "";
+          const res = await fetch(
+            "/api/members" + (q ? "?search=" + encodeURIComponent(q) : "")
+          );
+          if (!res.ok) {
+            console.error("Failed to fetch members:", res.status);
+            document.getElementById("members").innerHTML = '<div class="alert alert-danger">Failed to load members. Please refresh the page.</div>';
+            return;
+          }
+          let data = await res.json();
+          sessionStorage.setItem('membersCache', JSON.stringify(data));
+          data = applyClientFilters(data);
+          const el = document.getElementById("members");
+          el.innerHTML = "";
+          if (data.length === 0) {
+            el.innerHTML = '<div class="alert alert-info">No members match filters.</div>';
+            return;
+          }
+          if (memberView === 'table') {
+            renderMembersTable(el, data);
+            return;
+          }
+          const colors = ["primary","success","warning","info","danger","secondary"];
+          data.forEach((m) => {
+          const div = document.createElement("div");
+          const color = colors[m.id % colors.length];
+          div.className = `card mb-2 border-2 border-${color}`;
+          const avatar = m.image_url
+            ? `<img src="${m.image_url}" class="avatar rounded-circle me-2 border" />`
+            : `<i class="bi bi-person-circle fs-2 text-secondary me-2"></i>`;
+          const phoneRaw = m.phone_normalized || m.phone || "";
+          const flag = phoneToFlag(phoneRaw, DEFAULT_CC);
+          div.innerHTML = `<div class="card-body d-flex align-items-center">
+              <div class="me-2">${avatar}</div>
+              <div class="flex-grow-1">
+                <h5 class="mb-1"><span class="badge rounded-pill bg-${color} me-2">#${
+            m.serial
+          }</span> ${
+            m.name
+          } <small class="text-muted">(${flag} ${phoneRaw})</small>${
+            m.email
+              ? ` <a href=\"mailto:${m.email}\" class=\"ms-2 text-decoration-none\"><i class=\"bi bi-envelope-at\"></i></a>`
+              : ""
+          }</h5>
+                <div class="text-muted small">Admission: ${
+                  m.admission_date
+                }</div>
+                <div class="text-muted small">Fee: ${
+                  m.current_fee_status === "Paid"
+                    ? m.current_fee_amount != null
+                      ? `<span class=fee-paid>Paid Rs ${m.current_fee_amount}</span>`
+                      : `<span class=fee-paid>Paid</span>`
+                    : m.current_fee_status === "N/A"
+                    ? "N/A"
+                    : `<span class=fee-unpaid>Not Paid${
+                        m.monthly_fee || m.monthly_price
+                          ? ` (Rs ${m.monthly_fee || m.monthly_price})`
+                          : ""
+                      }</span>`
+                }</div>
+                ${
+                  m.last_tx_amount && m.last_tx_time
+                    ? `<div class=\"text-muted small\">Txn: Rs ${
+                        m.last_tx_amount
+                      } • ${new Date(m.last_tx_time).toLocaleString()}</div>`
+                    : ""
+                }
+                ${
+                  m.last_contact_at
+                    ? `<div class=\"text-muted small\">Last Contact: ${new Date(m.last_contact_at).toLocaleString()}</div>`
+                    : ""
+                }
+                <div class="mt-1">
+                  ${
+                    m.display_training_type
+                      ? `<span class=\"badge badge-training me-1\">${m.display_training_type}</span>`
+                      : ""
+                  }
+                  ${
+                    m.special_tag
+                      ? `<span class=\"badge bg-warning text-dark\">⭐ Special</span>`
+                      : ""
+                  }
+                </div>
+                <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
+                  <select
+                    class="form-select form-select-sm"
+                    style="min-width: 120px; max-width: 160px;"
+                    onchange="setPlan(${m.id}, this.value)"
+                  >
+                    <option value="monthly" ${
+                      m.plan_type === "monthly" ? "selected" : ""
+                    }>Monthly</option>
+                    <option value="yearly" ${
+                      m.plan_type === "yearly" ? "selected" : ""
+                    }>Yearly</option>
+                  </select>
+                  <a href="#" onclick="viewPayments(${m.id})" class="btn btn-sm btn-outline-primary"><i class="bi bi-table"></i> Payments</a>
+                  <button onclick="viewDetails(${m.id})" class="btn btn-sm btn-outline-secondary"><i class="bi bi-card-text"></i> Details</button>
+                  <button onclick="openEdit(${m.id})" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Edit</button>
+                  <a href="/api/members/${m.id}/export" class="btn btn-sm btn-outline-success"><i class="bi bi-filetype-xlsx"></i> Export</a>
+                  <button onclick="remind(${m.id})" class="btn btn-sm btn-outline-success"><i class="bi bi-whatsapp"></i> Remind</button>
+                  <button onclick="messageMember(${m.id})" class="btn btn-sm btn-outline-success"><i class="bi bi-chat-dots"></i> Message</button>
+                  <button onclick="payMonth(${m.id})" class="btn btn-sm btn-outline-primary"><i class="bi bi-cash-coin"></i> Pay (This Month)</button>
+                  <button onclick="payYear(${m.id})" class="btn btn-sm btn-outline-warning"><i class="bi bi-calendar-check"></i> Pay (Year)</button>
+                  <a href="/api/members/${m.id}/card" class="btn btn-sm btn-outline-danger"><i class="bi bi-filetype-pdf"></i> Card PDF</a>
+                  <button onclick="sendCard(${m.id})" class="btn btn-sm btn-outline-info"><i class="bi bi-send"></i> Send Card</button>
+                  <button data-referral="${(m.referral_code||'').replace(/'/g, "\\'")}" onclick="copyReferral(${m.id}, this.dataset.referral)" class="btn btn-sm btn-outline-secondary"><i class="bi bi-link-45deg"></i> Referral Link</button>
+                  <label class="btn btn-sm btn-outline-secondary mb-0">
+                    <i class="bi bi-image"></i> Upload Photo
+                    <input type="file" accept="image/*" class="d-none" onchange="handlePhoto(${m.id}, this.files[0])" />
+                  </label>
+                  <button class="btn btn-sm btn-outline-danger" onclick="removeMember(${m.id})"><i class="bi bi-trash"></i> Delete</button>
+                </div>
+              </div>
+            </div>`;
+          el.appendChild(div);
+          });
+        } catch (error) {
+          console.error("Error fetching members:", error);
+          document.getElementById("members").innerHTML = '<div class="alert alert-danger">Error loading members: ' + error.message + '</div>';
+        }
+      }
+
+      function renderMembersTable(container, data){
+        const table = document.createElement('table');
+        table.className = 'table table-striped table-bordered table-sm align-middle';
+        table.innerHTML = `<thead class="table-light">
+          <tr>
+            <th data-k="serial" onclick="sortMembers('serial')">Serial</th>
+            <th data-k="name" onclick="sortMembers('name')">Name</th>
+            <th data-k="phone" onclick="sortMembers('phone')">Phone</th>
+            <th data-k="admission" onclick="sortMembers('admission_date')">Admission</th>
+            <th data-k="status" onclick="sortMembers('current_fee_status')">Status</th>
+            <th>Training</th>
+            <th>Actions</th>
+          </tr>
+        </thead>`;
+        const tbody = document.createElement('tbody');
+        data.forEach(m => {
+          const feeBadge = m.current_fee_status === 'Paid'
+            ? `<span class="badge bg-success">Paid${m.current_fee_amount?` (Rs ${m.current_fee_amount})`:''}</span>`
+            : m.current_fee_status === 'Unpaid'
+              ? `<span class="badge bg-danger">Unpaid${(m.monthly_fee||m.monthly_price)?` (Rs ${m.monthly_fee||m.monthly_price})`:''}</span>`
+              : `<span class="badge bg-secondary">N/A</span>`;
+          const training = m.custom_training ? `<span class="badge bg-info text-dark">${m.custom_training}</span>` : `<span class="badge bg-light text-dark">${m.training_type}</span>`;
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>#${m.serial}</td>
+            <td>${m.name}${m.special_tag?` <span class='badge bg-warning text-dark'>⭐</span>`:''}</td>
+            <td>${m.phone || ''}</td>
+            <td>${m.admission_date}</td>
+            <td>${feeBadge}</td>
+            <td>${training}</td>
+            <td class="text-nowrap">
+              <button class="btn btn-sm btn-outline-secondary" onclick="openEdit(${m.id})"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-sm btn-outline-primary" onclick="payMonth(${m.id})"><i class="bi bi-cash-coin"></i></button>
+              <button class="btn btn-sm btn-outline-danger" onclick="removeMember(${m.id})"><i class="bi bi-trash"></i></button>
+            </td>`;
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        container.appendChild(table);
+      }
+      let sortState = { key: null, asc: true };
+      function sortMembers(key){
+        try {
+          const raw = JSON.parse(sessionStorage.getItem('membersCache')||'[]');
+          let data = applyClientFilters(raw);
+          if (sortState.key === key){
+            sortState.asc = !sortState.asc;
+          } else {
+            sortState.key = key; sortState.asc = true;
+          }
+          data.sort((a,b)=>{
+            const av = (a[key]||'').toString().toLowerCase();
+            const bv = (b[key]||'').toString().toLowerCase();
+            if (av < bv) return sortState.asc?-1:1;
+            if (av > bv) return sortState.asc?1:-1;
+            return 0;
+          });
+          const membersEl = document.getElementById('members');
+          membersEl.innerHTML='';
+          if (memberView==='table') renderMembersTable(membersEl, data); else {
+            // re-render cards
+            const colors = ["primary","success","warning","info","danger","secondary"];
+            data.forEach((m)=>{
+              const div=document.createElement('div');
+              const color=colors[m.id % colors.length];
+              div.className=`card mb-2 border-2 border-${color}`;
+              const avatar = m.image_url?`<img src='${m.image_url}' class='avatar rounded-circle me-2 border'/>`:`<i class='bi bi-person-circle fs-2 text-secondary me-2'></i>`;
+              const phoneRaw=m.phone_normalized||m.phone||'';
+              const flag=phoneToFlag(phoneRaw, DEFAULT_CC);
+              div.innerHTML = `<div class='card-body d-flex align-items-center'><div class='me-2'>${avatar}</div><div class='flex-grow-1'><h5 class='mb-1'><span class='badge rounded-pill bg-${color} me-2'>#${m.serial}</span> ${m.name} <small class='text-muted'>(${flag} ${phoneRaw})</small></h5></div></div>`;
+              membersEl.appendChild(div);
+            });
+          }
+        } catch(e){ console.error('Sort failed', e); }
+      }
+
+      document
+        .getElementById("addForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const payload = {
+            name: document.getElementById("name").value,
+            phone: document.getElementById("phone").value,
+            admission_date: document.getElementById("admission_date").value,
+            training_type:
+              document.getElementById("training_type")?.value || "standard",
+            special_tag: !!document.getElementById("special_tag")?.checked,
+            custom_training:
+              document.getElementById("custom_training")?.value || undefined,
+            monthly_fee:
+              document.getElementById("monthly_fee")?.value || undefined,
+          };
+          const res = await fetch("/api/members", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const m = await res.json();
+          const file = document.getElementById("photo").files[0];
+          if (res.ok) {
+            if (window.__capturedAddBlob) {
+              try {
+                const f = new File([window.__capturedAddBlob], "capture.png", {
+                  type: "image/png",
+                });
+                await uploadPhoto(m.id, f);
+              } catch (err) {
+                console.warn("Failed to upload captured photo:", err);
+              }
+            } else if (file) {
+              await uploadPhoto(m.id, file);
+            }
+            // optional initial payment
+            const markPaid = document.getElementById("init_paid")?.checked;
+            const amtStr = document.getElementById("monthly_fee")?.value;
+            const amt = amtStr ? parseFloat(amtStr) : null;
+            if (markPaid && amt && !Number.isNaN(amt)) {
+              try {
+                const now = new Date();
+                const payloadPay = {
+                  plan_type: "monthly",
+                  year: now.getFullYear(),
+                  month: now.getMonth() + 1,
+                  amount: amt,
+                  method: "cash",
+                };
+                await fetch(`/api/members/${m.id}/pay`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(payloadPay),
+                });
+              } catch (e) {
+                console.warn("Initial payment failed", e);
+              }
+            }
+          }
+          document.getElementById("addForm").reset();
+          // reset camera UI state
+          window.__capturedAddBlob = null;
+          stopAddCamera();
+          fetchMembers();
+        });
+
+      async function uploadPhoto(id, file) {
+        const fd = new FormData();
+        fd.append("photo", file);
+        const res = await fetch(`/api/members/${id}/photo`, {
+          method: "POST",
+          body: fd,
+        });
+        const data = await res.json();
+        if (!data.ok)
+          alert("Photo upload failed: " + (data.error || "unknown"));
+      }
+
+      async function handlePhoto(id, file) {
+        if (!file) return;
+        await uploadPhoto(id, file);
+        fetchMembers();
+      }
+
+      // Add Member camera capture
+      let addCamStreamRef = null;
+      window.__capturedAddBlob = null;
+      async function startAddCamera() {
+        try {
+          addCamStreamRef = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          const v = document.getElementById("addCamStream");
+          v.srcObject = addCamStreamRef;
+          v.classList.remove("d-none");
+          document.getElementById("addCamRow").classList.remove("d-none");
+          document.getElementById("btnAddStartCam").classList.add("disabled");
+          document.getElementById("btnAddCapture").classList.remove("d-none");
+          document.getElementById("btnAddStopCam").classList.remove("d-none");
+          document.getElementById("addCaptureStatus").textContent =
+            "Camera ready";
+        } catch (e) {
+          alert("Camera access denied");
+        }
+      }
+      function stopAddCamera() {
+        if (addCamStreamRef) {
+          addCamStreamRef.getTracks().forEach((t) => t.stop());
+          addCamStreamRef = null;
+        }
+        document.getElementById("addCamStream").classList.add("d-none");
+        document.getElementById("btnAddStartCam").classList.remove("disabled");
+        document.getElementById("btnAddCapture").classList.add("d-none");
+        document.getElementById("btnAddStopCam").classList.add("d-none");
+        document.getElementById("addCaptureStatus").textContent = "";
+        document.getElementById("addCamRow").classList.add("d-none");
+      }
+      async function captureAddPhoto() {
+        const v = document.getElementById("addCamStream");
+        if (!v) return;
+        const canvas = document.getElementById("addCamCanvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        ctx.drawImage(v, 0, 0);
+        canvas.toBlob((blob) => {
+          window.__capturedAddBlob = blob;
+          document.getElementById("addCaptureStatus").textContent =
+            "Snapshot captured ✅ (will be saved on Add)";
+          // Show the captured preview once
+          canvas.classList.remove("d-none");
+        }, "image/png");
+      }
+
+      async function viewPayments(id) {
+        const res = await fetch(`/api/members/${id}/payments`);
+        const payments = await res.json();
+        let html =
+          '<table class="table"><thead><tr><th>Year</th><th>Month</th><th>Status</th><th>Action</th></tr></thead><tbody>';
+        payments.forEach((p) => {
+          html += `<tr><td>${p.year}</td><td>${p.month}</td><td id="status-${p.id}">${p.status}</td>
+          <td>
+            <button class="btn btn-sm btn-success" onclick="updatePay(${p.id}, 'Paid')">Paid</button>
+            <button class="btn btn-sm btn-warning" onclick="updatePay(${p.id}, 'Unpaid')">Unpaid</button>
+            <button class="btn btn-sm btn-secondary" onclick="updatePay(${p.id}, 'N/A')">N/A</button>
+          </td></tr>`;
+        });
+        html += "</tbody></table>";
+        const win = window.open("", "_blank", "width=800,height=600");
+        win.document.write(
+          '<html><head><title>Payments</title><link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"></head><body class="p-3">' +
+            html +
+            "</body></html>"
+        );
+      }
+
+      async function updatePay(paymentId, status) {
+        await fetch("/api/payments/" + paymentId, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status }),
+        });
+        alert("Updated");
+      }
+
+      async function setPlan(id, plan) {
+        const res = await fetch(`/api/members/${id}/plan`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ plan_type: plan }),
+        });
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({ error: "failed" }));
+          alert("Failed to update plan: " + (d.error || res.status));
+        }
+      }
+
+      async function viewDetails(id) {
+        const [paymentsRes, txRes] = await Promise.all([
+          fetch(`/api/members/${id}/payments`),
+          fetch(`/api/members/${id}/transactions`),
+        ]);
+        const payments = await paymentsRes.json();
+        const txns = await txRes.json();
+        let phtml =
+          '<table class="table table-sm"><thead><tr><th>Year</th><th>Month</th><th>Status</th></tr></thead><tbody>';
+        payments.forEach(
+          (p) =>
+            (phtml += `<tr><td>${p.year}</td><td>${p.month}</td><td>${p.status}</td></tr>`)
+        );
+        phtml += "</tbody></table>";
+        document.getElementById("tab-payments").innerHTML = phtml;
+        let thtml =
+          '<table class="table table-sm"><thead><tr><th>Date</th><th>Plan</th><th>Year</th><th>Month</th><th>Amount</th><th>Method</th></tr></thead><tbody>';
+        txns.forEach(
+          (t) =>
+            (thtml += `<tr><td>${t.created_at}</td><td>${t.plan_type}</td><td>${
+              t.year
+            }</td><td>${t.month || ""}</td><td>${t.amount || ""}</td><td>${
+              t.method || ""
+            }</td></tr>`)
+        );
+        thtml += "</tbody></table>";
+        document.getElementById("tab-transactions").innerHTML = thtml;
+        document.getElementById("md-basic").innerHTML = `Member ID: ${id}`;
+        const modal = new bootstrap.Modal(
+          document.getElementById("memberDetailsModal")
+        );
+        modal.show();
+      }
+
+      async function remind(id) {
+        const res = await fetch(`/api/members/${id}/remind`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (data.ok) alert("WhatsApp reminder sent");
+        else alert("Failed: " + (data.error || "unknown error"));
+      }
+
+      async function messageMember(id) {
+        const msg = prompt("Enter WhatsApp message:", "");
+        if (msg === null) return;
+        const phoneOverride = prompt(
+          "Override phone (leave blank to use saved number):",
+          ""
+        );
+        const payload = { message: msg };
+        if (phoneOverride && phoneOverride.trim()) {
+          payload.phone = phoneOverride.trim();
+        }
+        const res = await fetch(`/api/members/${id}/message`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert("Message sent");
+          fetchMembers();
+        } else {
+          alert("Failed: " + (data.error || data.result || "unknown"));
+        }
+      }
+
+      async function payMonth(id) {
+        const y = new Date().getFullYear();
+        const m = new Date().getMonth() + 1;
+        const amount = prompt("Amount (optional):", "");
+        await fetch(`/api/members/${id}/pay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            plan_type: "monthly",
+            year: y,
+            month: m,
+            amount: amount ? Number(amount) : undefined,
+          }),
+        });
+        fetchMembers();
+        alert("Paid for this month.");
+      }
+
+      async function payYear(id) {
+        const y = new Date().getFullYear();
+        const amount = prompt("Year amount (optional):", "");
+        await fetch(`/api/members/${id}/pay`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            plan_type: "yearly",
+            year: y,
+            amount: amount ? Number(amount) : undefined,
+          }),
+        });
+        fetchMembers();
+        alert("Year marked paid.");
+      }
+
+      function copyReferral(id, code) {
+        if (!code) {
+          alert("Referral code missing for this member.");
+          return;
+        }
+        const url = `${location.origin}/r/${code}`;
+        navigator.clipboard.writeText(url).then(() => alert("Copied: " + url));
+      }
+
+      async function sendCard(id) {
+        const email = prompt(
+          "Enter email address (leave blank to skip email):",
+          ""
+        );
+        const whatsapp = prompt(
+          "Enter WhatsApp number (with country code or local; leave blank to skip WhatsApp):",
+          ""
+        );
+        if (!email && !whatsapp) {
+          alert("Nothing to send: provide email and/or WhatsApp number.");
+          return;
+        }
+        const res = await fetch(`/api/members/${id}/card/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, whatsapp }),
+        });
+        const data = await res.json();
+        if (res.ok && data.ok) {
+          alert("Card sent successfully.");
+        } else {
+          try {
+            const parts = [];
+            if (data.results?.email && !data.results.email.ok)
+              parts.push("email failed");
+            if (data.results?.whatsapp && !data.results.whatsapp.ok)
+              parts.push("whatsapp failed");
+            alert(
+              "Partial/failed: " +
+                (parts.join(", ") || data.error || "unknown error")
+            );
+          } catch (e) {
+            alert("Failed to send card.");
+          }
+        }
+      }
+
+      async function removeMember(id) {
+        if (!confirm("Delete this member and all related data?")) return;
+        const res = await fetch(`/api/members/${id}`, { method: "DELETE" });
+        const data = await res.json();
+        if (data.ok) {
+          fetchMembers();
+        } else {
+          alert("Delete failed: " + (data.error || "unknown"));
+        }
+      }
+
+      document
+        .getElementById("uploadForm")
+        ?.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const file = document.getElementById("csvfile").files[0];
+          if (!file) {
+            alert("Select a CSV file first");
+            return;
+          }
+          const fd = new FormData();
+          fd.append("file", file);
+          const res = await fetch("/admin/members/upload", {
+            method: "POST",
+            body: fd,
+          });
+          const data = await res.json();
+          if (data.ok) {
+            alert("Imported " + data.created + " members");
+            fetchMembers();
+          } else {
+            alert("Upload failed: " + (data.error || "unknown error"));
+          }
+        });
+
+      fetchMembers();
+      fetchUploads();
+
+      document.getElementById("search").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          fetchMembers();
+        }
+      });
+      // Data uploads handling
+      async function fetchUploads() {
+        const res = await fetch("/api/uploads");
+        const data = await res.json();
+        const list = document.getElementById("uploadsList");
+        if (!Array.isArray(data) || !data.length) {
+          list.innerHTML = '<div class="text-muted">No uploads yet.</div>';
+          return;
+        }
+        let html =
+          '<table class="table table-sm"><thead><tr><th>ID</th><th>Name</th><th>Rows</th><th>Uploaded</th><th></th></tr></thead><tbody>';
+        data.forEach((f) => {
+          html += `<tr><td>${f.id}</td><td>${f.original_name}</td><td>${f.rows_count}</td><td>${f.uploaded_at}</td><td><button class="btn btn-sm btn-outline-secondary" onclick="viewUpload(${f.id})">View</button></td></tr>`;
+        });
+        html += "</tbody></table>";
+        list.innerHTML = html;
+      }
+      async function viewUpload(id) {
+        const res = await fetch(`/api/uploads/${id}`);
+        const data = await res.json();
+        if (!data || !data.id) {
+          alert("Failed to load upload");
+          return;
+        }
+        let rowsHtml = "";
+        const rows = data.rows || [];
+        if (rows.length) {
+          rowsHtml =
+            '<table class="table table-sm"><thead><tr>' +
+            Object.keys(rows[0])
+              .map((k) => `<th>${k}</th>`)
+              .join("") +
+            "</tr></thead><tbody>" +
+            rows
+              .map(
+                (r) =>
+                  "<tr>" +
+                  Object.keys(rows[0])
+                    .map((k) => `<td>${r[k] ?? ""}</td>`)
+                    .join("") +
+                  "</tr>"
+              )
+              .join("") +
+            "</tbody></table>";
+        } else {
+          rowsHtml =
+            '<div class="text-muted">No preview rows (unsupported format or empty).</div>';
+        }
+        const w = window.open("", "_blank", "width=1000,height=700");
+        w.document.write(
+          `<html><head><title>Upload ${data.id}</title><link href=\"https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css\" rel=\"stylesheet\"></head><body class='p-3'><h5>File: ${data.original_name}</h5><div>Rows: ${data.rows_count}</div>${rowsHtml}</body></html>`
+        );
+      }
+      document
+        .getElementById("dataUploadForm")
+        ?.addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const f = document.getElementById("dataFile").files[0];
+          if (!f) {
+            alert("Choose a file");
+            return;
+          }
+          const fd = new FormData();
+          fd.append("file", f);
+          const res = await fetch("/api/uploads", { method: "POST", body: fd });
+          const data = await res.json();
+          const status = document.getElementById("uploadStatus");
+          if (data.ok) {
+            status.innerHTML = `<div class='alert alert-success'>Uploaded ${data.file.original_name} (rows: ${data.file.rows_count})</div>`;
+            document.getElementById("dataUploadForm").reset();
+            fetchUploads();
+          } else {
+            status.innerHTML = `<div class='alert alert-danger'>Failed: ${
+              data.error || "unknown"
+            }</div>`;
+          }
+        });
+      // Show custom training when 'other' selected
+      document
+        .getElementById("training_type")
+        ?.addEventListener("change", (e) => {
+          const val = e.target.value;
+          const row = document.getElementById("customTrainingRow");
+          if (val === "other") {
+            row.style.display = "";
+          } else {
+            row.style.display = "none";
+            document.getElementById("custom_training").value = "";
+          }
+        });
+      updateDefaultFlags();
+      updatePhoneFlag();
+      document.addEventListener("input", (e) => {
+        if (e.target && e.target.id === "phone") {
+          updatePhoneFlag();
+        }
+      });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      // Edit member functions
+      async function openEdit(id) {
+        const res = await fetch(`/api/members/${id}`);
+        if (!res.ok) {
+          alert("Failed to fetch member");
+          return;
+        }
+        const m = await res.json();
+        document.getElementById("edit_id").value = m.id;
+        document.getElementById("edit_name").value = m.name || "";
+        document.getElementById("edit_phone").value = m.phone || "";
+        document.getElementById("edit_admission").value =
+          m.admission_date || "";
+        document.getElementById("edit_plan").value = m.plan_type || "monthly";
+        document.getElementById("edit_access").value =
+          m.access_tier || "standard";
+        // training type & custom training setup
+        const tt = m.training_type || "standard";
+        let effective = tt;
+        if (m.custom_training && m.custom_training.trim()) {
+          effective = "other";
+        }
+        document.getElementById("edit_training_type").value = effective;
+        const wrap = document.getElementById("edit_custom_training_wrap");
+        if (effective === "other") {
+          wrap.style.display = "";
+          document.getElementById("edit_custom_training").value =
+            m.custom_training || "";
+        } else {
+          wrap.style.display = "none";
+          document.getElementById("edit_custom_training").value = "";
+        }
+        document.getElementById("edit_monthly_fee").value =
+          m.monthly_fee != null ? m.monthly_fee : "";
+        document.getElementById("edit_special_tag").checked = !!m.special_tag;
+        const modal = new bootstrap.Modal(
+          document.getElementById("editMemberModal")
+        );
+        modal.show();
+      }
+      async function saveEdit() {
+        const id = document.getElementById("edit_id").value;
+        const payload = {
+          name: document.getElementById("edit_name").value,
+          phone: document.getElementById("edit_phone").value,
+          admission_date: document.getElementById("edit_admission").value,
+          plan_type: document.getElementById("edit_plan").value,
+          access_tier: document.getElementById("edit_access").value,
+          training_type: document.getElementById("edit_training_type").value,
+          custom_training:
+            document.getElementById("edit_custom_training").value || undefined,
+          monthly_fee:
+            document.getElementById("edit_monthly_fee").value || undefined,
+          special_tag: document.getElementById("edit_special_tag").checked,
+        };
+        const res = await fetch(`/api/members/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          fetchMembers();
+          alert("Saved");
+        } else {
+          alert("Save failed");
+        }
+      }
+      // Edit training type dynamic custom field
+      document
+        .getElementById("edit_training_type")
+        ?.addEventListener("change", (e) => {
+          const wrap = document.getElementById("edit_custom_training_wrap");
+          if (e.target.value === "other") {
+            wrap.style.display = "";
+          } else {
+            wrap.style.display = "none";
+            document.getElementById("edit_custom_training").value = "";
+          }
+        });
+      // Camera capture
+      let camStreamRef = null;
+      async function startCamera() {
+        try {
+          camStreamRef = await navigator.mediaDevices.getUserMedia({
+            video: true,
+          });
+          const v = document.getElementById("camStream");
+          v.srcObject = camStreamRef;
+          v.classList.remove("d-none");
+          document.getElementById("btnStartCam").classList.add("d-none");
+          document.getElementById("btnCapture").classList.remove("d-none");
+          document.getElementById("btnStopCam").classList.remove("d-none");
+          document.getElementById("captureStatus").textContent = "Camera ready";
+        } catch (e) {
+          alert("Camera access denied");
+        }
+      }
+      function stopCamera() {
+        if (camStreamRef) {
+          camStreamRef.getTracks().forEach((t) => t.stop());
+          camStreamRef = null;
+        }
+        document.getElementById("camStream").classList.add("d-none");
+        document.getElementById("btnStartCam").classList.remove("d-none");
+        document.getElementById("btnCapture").classList.add("d-none");
+        document.getElementById("btnStopCam").classList.add("d-none");
+        document.getElementById("captureStatus").textContent = "";
+      }
+      async function capturePhoto() {
+        const v = document.getElementById("camStream");
+        const id = document.getElementById("edit_id").value;
+        if (!v || !id) {
+          alert("No member or video");
+          return;
+        }
+        const canvas = document.getElementById("camCanvas");
+        canvas.width = v.videoWidth;
+        canvas.height = v.videoHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(v, 0, 0);
+        canvas.toBlob(async (blob) => {
+          const fd = new FormData();
+          fd.append("photo", blob, "capture.png");
+          const res = await fetch(`/api/members/${id}/photo`, {
+            method: "POST",
+            body: fd,
+          });
+          const data = await res.json();
+          document.getElementById("captureStatus").textContent = data.ok
+            ? "Uploaded ✅"
+            : "Failed: " + (data.error || "");
+          if (data.ok) fetchMembers();
+        }, "image/png");
+      }
+      // Auto submit CSV on selection
+      document.getElementById("csvfile")?.addEventListener("change", () => {
+        if (document.getElementById("csvfile").files.length) {
+          document.getElementById("uploadForm").requestSubmit();
+        }
+      });
+
+      // Register Service Worker for Offline Support
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/static/service-worker.js')
+            .then(reg => console.log('SW registered'))
+            .catch(err => console.log('SW failed:', err));
+        });
+      }
+    </script>
+  </body>
+</html>

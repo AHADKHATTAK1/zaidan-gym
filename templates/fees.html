@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#00C46C" />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Fees - {{ gym_name }}</title>
+    <script>
+      (function () {
+        try {
+          var th = localStorage.getItem("theme") || "dark";
+          document.documentElement.setAttribute("data-bs-theme", th);
+        } catch (e) {}
+      })();
+    </script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/theme.css" />
+    <style>
+      /* Page specific header tweak */
+      .app-header {
+        border: 0 !important;
+      }
+      .app-header .btn {
+        color: var(--white);
+      }
+    </style>
+  </head>
+  <body class="p-4">
+    <div class="container">
+      <nav class="navbar navbar-expand app-header rounded px-3 mb-4 shadow-sm">
+        <a
+          class="navbar-brand d-flex align-items-center gap-2"
+          href="/dashboard"
+        >
+          {% if logo_url %}
+          <img
+            src="{{ logo_url }}"
+            alt="Logo"
+            style="height: 28px; width: auto; border-radius: 4px"
+          />
+          {% endif %}
+          <span class="brand">{{ gym_name }}</span>
+        </a>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <span class="badge text-bg-dark border border-light"
+            >{{ monthly_price }} {{ currency_code }}/mo</span
+          >
+          <span class="fs-5" id="defaultFlag" title="Default Country"></span>
+          <button
+            class="btn btn-sm btn-outline-light"
+            id="themeToggle"
+            title="Toggle theme"
+          >
+            <i class="bi bi-moon-stars"></i>
+          </button>
+          <a class="btn btn-sm btn-outline-light me-2" href="/members"
+            >Members</a
+          >
+          <a class="btn btn-sm btn-outline-light me-2" href="/fees">Fees</a>
+          <a class="btn btn-sm btn-outline-light" href="/logout">Logout</a>
+        </div>
+      </nav>
+
+      <h1>
+        Monthly Fees
+        <small class="text-muted fs-6">
+          Default price: {{ monthly_price }} {{ currency_code }}/mo
+        </small>
+      </h1>
+      <hr />
+
+      <div class="row g-2 align-items-end mb-3">
+        <div class="col-md-3">
+          <label class="form-label">Year</label>
+          <input id="year" class="form-control" type="number" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label">Month</label>
+          <select id="month" class="form-select">
+            <option value="1">January</option>
+            <option value="2">February</option>
+            <option value="3">March</option>
+            <option value="4">April</option>
+            <option value="5">May</option>
+            <option value="6">June</option>
+            <option value="7">July</option>
+            <option value="8">August</option>
+            <option value="9">September</option>
+            <option value="10">October</option>
+            <option value="11">November</option>
+            <option value="12">December</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <div class="d-flex gap-2">
+            <button
+              class="btn btn-outline-primary flex-grow-1"
+              onclick="refreshAll()"
+            >
+              Load
+            </button>
+            <div class="form-check form-switch d-flex align-items-center">
+              <input
+                class="form-check-input"
+                type="checkbox"
+                id="autoRefresh"
+                checked
+              />
+              <label class="form-check-label ms-2" for="autoRefresh"
+                >Auto</label
+              >
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3 text-end">
+          <button class="btn btn-success" onclick="remindAll()">
+            Remind All Unpaid
+          </button>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-12">
+          <div class="card">
+            <div class="card-body d-flex flex-wrap gap-4 align-items-center">
+              <div>
+                <div class="text-muted small">Total Paid Fees</div>
+                <div class="h5 mb-0">
+                  <span id="sumPaid">0</span> {{ currency_code }}
+                </div>
+              </div>
+              <div>
+                <div class="text-muted small">Total Unpaid Fees</div>
+                <div class="h5 mb-0">
+                  <span id="sumUnpaid">0</span> {{ currency_code }}
+                </div>
+              </div>
+              <div>
+                <div class="text-muted small">Paid Members Count</div>
+                <div class="h5 mb-0" id="cntPaid">0</div>
+              </div>
+              <div>
+                <div class="text-muted small">Unpaid Members Count</div>
+                <div class="h5 mb-0" id="cntUnpaid">0</div>
+              </div>
+              <div>
+                <div class="text-muted small">Payment %</div>
+                <div class="h5 mb-0" id="payPct">0%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-3">
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <div class="text-muted">Paid</div>
+              <div id="paidCount" class="display-6 text-success">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <div class="text-muted">Unpaid</div>
+              <div id="unpaidCount" class="display-6 text-warning">0</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="card text-center">
+            <div class="card-body">
+              <div class="text-muted">N/A</div>
+              <div id="naCount" class="display-6 text-secondary">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        <div class="col-md-6">
+          <h4 id="unpaid">Unpaid</h4>
+          <table class="table table-sm" id="unpaidTbl">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="col-md-6">
+          <h4 id="paid">Paid</h4>
+          <table class="table table-sm" id="paidTbl">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h4 id="na" class="mt-4">N/A</h4>
+          <div class="small text-muted">Count shown above</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const CURRENCY = '{{ currency_code }}';
+      // Theme toggle wiring
+      (function(){
+        var btn = document.getElementById('themeToggle');
+        if (btn){
+          btn.addEventListener('click', function(){
+            var cur = document.documentElement.getAttribute('data-bs-theme') || 'dark';
+            var next = cur === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-bs-theme', next);
+            try{ localStorage.setItem('theme', next); }catch(e){}
+          });
+        }
+      })();
+      const DEFAULT_CC = '{{ default_cc }}';
+      const CC_TO_ISO = { '92':'PK','91':'IN','1':'US','44':'GB','971':'AE','974':'QA','966':'SA','880':'BD','977':'NP','94':'LK','60':'MY','65':'SG','61':'AU','81':'JP','49':'DE','33':'FR','39':'IT','86':'CN','7':'RU','34':'ES','351':'PT','41':'CH','31':'NL','90':'TR','20':'EG','62':'ID','63':'PH','64':'NZ','82':'KR','55':'BR','52':'MX','27':'ZA','972':'IL','98':'IR','964':'IQ','965':'KW','968':'OM','973':'BH','216':'TN','213':'DZ','254':'KE','255':'TZ','256':'UG' };
+      function isoToFlag(iso){ if(!iso) return '🌐'; const up=iso.toUpperCase(); return String.fromCodePoint(...[...up].map(c=>127397+c.charCodeAt(0))); }
+      function phoneToFlag(phone, defCC){
+        if(!phone){ return isoToFlag(CC_TO_ISO[defCC]||''); }
+        let p = phone.trim();
+        if(p.startsWith('+')){
+          p = p.slice(1);
+          for (let len of [3,2,1]){
+            const code = p.slice(0,len);
+            if(CC_TO_ISO[code]) return isoToFlag(CC_TO_ISO[code]);
+          }
+          return '🌐';
+        }
+        return isoToFlag(CC_TO_ISO[defCC]||'');
+      }
+      function setDefaults() {
+        const url = new URL(window.location.href);
+        const qYear = url.searchParams.get("year");
+        const qMonth = url.searchParams.get("month");
+        const now = new Date();
+        document.getElementById("year").value = qYear
+          ? parseInt(qYear, 10)
+          : now.getFullYear();
+        document.getElementById("month").value = qMonth
+          ? qMonth
+          : (now.getMonth() + 1).toString();
+      }
+      async function loadFees() {
+        const y = document.getElementById("year").value;
+        const m = document.getElementById("month").value;
+        const res = await fetch(`/api/fees?year=${y}&month=${m}`);
+        const rows = await res.json();
+        const paid = rows.filter((r) => r.status === "Paid");
+        const unpaid = rows.filter((r) => r.status === "Unpaid");
+        const na = rows.filter((r) => r.status === "N/A");
+        document.getElementById("paidCount").innerText = paid.length;
+        document.getElementById("unpaidCount").innerText = unpaid.length;
+        document.getElementById("naCount").innerText = na.length;
+        const upT = document.querySelector("#unpaidTbl tbody");
+        const pT = document.querySelector("#paidTbl tbody");
+        upT.innerHTML = "";
+        pT.innerHTML = "";
+        unpaid.forEach((r) => {
+          const tr = document.createElement("tr");
+          const phoneRaw = r.member.phone || "";
+          const flag = phoneToFlag(phoneRaw, DEFAULT_CC);
+          tr.innerHTML = `<td>${r.member.serial}</td><td>${
+            r.member.name
+          }</td><td>${flag} ${phoneRaw}</td>
+            <td><button class="btn btn-sm btn-outline-success" onclick="remindSingle(${\
+              r.member.id\
+            })">Remind</button></td>`;
+          upT.appendChild(tr);
+        });
+        paid.forEach((r) => {
+          const tr = document.createElement("tr");
+          const phoneRaw = r.member.phone || "";
+          const flag = phoneToFlag(phoneRaw, DEFAULT_CC);
+          tr.innerHTML = `<td>${r.member.serial}</td><td>${
+            r.member.name
+          }</td><td>${flag} ${phoneRaw}</td>`;
+          pT.appendChild(tr);
+        });
+      }
+
+      async function loadSummary(){
+        const y = document.getElementById('year').value;
+        const m = document.getElementById('month').value;
+        const res = await fetch(`/api/fees/summary?year=${y}&month=${m}`);
+        const s = await res.json();
+        if (!s.ok) return;
+        document.getElementById('sumPaid').innerText = s.paid_total.toLocaleString();
+        document.getElementById('sumUnpaid').innerText = s.unpaid_total.toLocaleString();
+        document.getElementById('cntPaid').innerText = s.paid_count;
+        document.getElementById('cntUnpaid').innerText = s.unpaid_count;
+        document.getElementById('payPct').innerText = s.payment_percent + '%';
+      }
+
+      let refreshTimer = null;
+      function refreshAll(){ loadFees(); loadSummary(); }
+      function setAutoRefresh(){
+        const on = document.getElementById('autoRefresh').checked;
+        if (refreshTimer){ clearInterval(refreshTimer); refreshTimer = null; }
+        if (on){ refreshTimer = setInterval(refreshAll, 30000); }
+      }
+      async function remindAll() {
+        const y = document.getElementById("year").value;
+        const m = document.getElementById("month").value;
+        const res = await fetch(`/api/fees/remind?year=${y}&month=${m}`, {
+          method: "POST",
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert(`Reminders sent: ${data.sent}, failed: ${data.failed}`);
+        } else {
+          alert("Failed: " + (data.error || "unknown error"));
+        }
+      }
+      async function remindSingle(memberId) {
+        const res = await fetch(`/api/members/${memberId}/remind`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          alert("Reminder sent");
+        } else {
+          alert("Failed: " + (data.error || "error"));
+        }
+      }
+      setDefaults();
+      refreshAll();
+      // If there is a hash (#paid/#unpaid/#na), scroll to it after load
+      window.addEventListener("load", () => {
+        if (location.hash) {
+          const el = document.querySelector(location.hash);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        const df = document.getElementById('defaultFlag');
+        if (df) df.textContent = isoToFlag(CC_TO_ISO[DEFAULT_CC]||'');
+        setAutoRefresh();
+        document.getElementById('autoRefresh').addEventListener('change', setAutoRefresh);
+      });
+
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/static/service-worker.js')
+          .then(reg => console.log('SW registered'))
+          .catch(err => console.log('SW failed:', err));
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

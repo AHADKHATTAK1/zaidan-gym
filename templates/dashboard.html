@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Premium Gym Management & POS System" />
+    <meta name="theme-color" content="#00C46C" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <link rel="manifest" href="/manifest.json" />
+    <title>Dashboard - {{ gym_name }}</title>
+    <script>
+      (function () {
+        try {
+          var th = localStorage.getItem("theme") || "dark";
+          document.documentElement.setAttribute("data-bs-theme", th);
+        } catch (e) {}
+      })();
+    </script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/static/css/theme.css" />
+  </head>
+  <body class="p-4">
+    <div class="container">
+      <nav class="navbar navbar-expand border rounded px-3 mb-3">
+        <a
+          class="navbar-brand d-flex align-items-center gap-2"
+          href="/dashboard"
+        >
+          {% if logo_url %}
+          <img
+            src="{{ logo_url }}"
+            alt="Logo"
+            style="height: 28px; width: auto; border-radius: 4px"
+          />
+          {% endif %}
+          <span class="brand">{{ gym_name }}</span>
+        </a>
+        <div class="ms-auto d-flex align-items-center gap-2">
+          <span class="badge text-bg-secondary"
+            >{{ monthly_price }} {{ currency_code }}/mo</span
+          >
+          <span class="fs-5" id="defaultFlag" title="Default Country"></span>
+          <span class="me-3">Hello, {{username}}</span>
+          <button
+            class="btn btn-sm btn-outline-light me-2"
+            data-bs-toggle="modal"
+            data-bs-target="#settingsModal"
+          >
+            <i class="bi bi-gear"></i> Settings
+          </button>
+          <button
+            class="btn btn-sm btn-outline-light"
+            id="themeToggle"
+            title="Toggle theme"
+          >
+            <i class="bi bi-moon-stars"></i>
+          </button>
+          <a class="btn btn-sm btn-outline-secondary me-2" href="/members"
+            >Members</a
+          >
+          <a class="btn btn-sm btn-outline-primary me-2" href="/fees">Fees</a>
+          <a class="btn btn-sm btn-outline-danger" href="/logout">Logout</a>
+        </div>
+      </nav>
+      <hr />
+
+      <div class="row g-3 mb-4">
+        <div class="col-12 mb-2 d-flex gap-2">
+          <button
+            id="btnEmailBackup"
+            class="btn btn-outline-primary btn-sm"
+            onclick="emailBackup()"
+          >
+            <i class="bi bi-envelope-paper me-1"></i>Email Backup
+          </button>
+          <button
+            id="btnDriveBackup"
+            class="btn btn-outline-success btn-sm"
+            onclick="driveBackup()"
+          >
+            <i class="bi bi-google-drive me-1"></i>Drive Backup
+          </button>
+          <button
+            id="btnDownloadBackup"
+            class="btn btn-outline-secondary btn-sm"
+            onclick="downloadBackup()"
+          >
+            <i class="bi bi-download me-1"></i>Download Backup
+          </button>
+          <a class="btn btn-outline-secondary btn-sm" href="/members"
+            ><i class="bi bi-people me-1"></i>Manage Members</a
+          >
+          <a class="btn btn-outline-success btn-sm" href="/fees"
+            ><i class="bi bi-cash-coin me-1"></i>Monthly Fees</a
+          >
+        </div>
+        <div class="col-md-3">
+          <a class="text-decoration-none" href="/members">
+            <div class="card text-center kpi-card" style="--d: 0s">
+              <div class="card-body">
+                <div class="text-muted">Members</div>
+                <div class="display-6">{{total_members}}</div>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-md-3">
+          <a
+            class="text-decoration-none"
+            href="/fees?year={{year}}&month={{month}}#paid"
+          >
+            <div class="card text-center kpi-card" style="--d: 0.05s">
+              <div class="card-body">
+                <div class="text-muted">Paid ({{month}}/{{year}})</div>
+                <div class="display-6 text-success">{{paid_count}}</div>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-md-3">
+          <a
+            class="text-decoration-none"
+            href="/fees?year={{year}}&month={{month}}#unpaid"
+          >
+            <div class="card text-center kpi-card" style="--d: 0.1s">
+              <div class="card-body">
+                <div class="text-muted">Unpaid ({{month}}/{{year}})</div>
+                <div class="display-6 text-warning">{{unpaid_count}}</div>
+              </div>
+            </div>
+          </a>
+        </div>
+        <div class="col-md-3">
+          <a
+            class="text-decoration-none"
+            href="/fees?year={{year}}&month={{month}}#na"
+          >
+            <div class="card text-center kpi-card" style="--d: 0.15s">
+              <div class="card-body">
+                <div class="text-muted">N/A ({{month}}/{{year}})</div>
+                <div class="display-6 text-secondary">{{na_count}}</div>
+              </div>
+            </div>
+          </a>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-md-3">
+          <div class="card text-center kpi-card" style="--d: 0.2s">
+            <div class="card-body">
+              <div class="text-muted">Collected This Month</div>
+              <div class="display-6">
+                <span id="collectedAmt">0</span> {{ currency_code or '' }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">This Year Overview</h5>
+            <div class="d-flex align-items-center gap-2">
+              <label class="form-label mb-0 small">Year</label>
+              <input
+                id="statYear"
+                class="form-control form-control-sm"
+                type="number"
+                style="width: 100px"
+              />
+              <button
+                class="btn btn-sm btn-outline-primary"
+                onclick="loadStats()"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+          <canvas id="feesChart" height="100"></canvas>
+        </div>
+      </div>
+
+      <div class="card mb-4">
+        <div class="card-body">
+          <h5 class="card-title mb-3">
+            <i class="bi bi-whatsapp me-1 text-success"></i>WhatsApp Test
+          </h5>
+          <div class="mb-2">
+            <span id="waCfgBadge" class="badge text-bg-secondary"
+              >Checking WhatsApp configuration…</span
+            >
+          </div>
+          <div class="row g-2 align-items-end">
+            <div class="col-md-3">
+              <label class="form-label">Phone (with country code)</label>
+              <div class="input-group">
+                <span class="input-group-text" id="waToFlag">🌐</span>
+                <input
+                  id="waTo"
+                  class="form-control"
+                  placeholder="+91XXXXXXXXXX"
+                />
+              </div>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label">Message</label>
+              <input
+                id="waMsg"
+                class="form-control"
+                placeholder="Hello from Gym Tracker"
+              />
+            </div>
+            <div class="col-md-2">
+              <button class="btn btn-success w-100" onclick="sendWaTest()">
+                <i class="bi bi-send"></i> Send
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h4>Recent Members</h4>
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Admission</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in recent_members %}
+          <tr>
+            <td>{{m.id}}</td>
+            <td>{{m.name}}</td>
+            <td>{{m.phone}}</td>
+            <td>{{m.admission_date}}</td>
+          </tr>
+          {% endfor %} {% if recent_members|length == 0 %}
+          <tr>
+            <td colspan="4" class="text-muted">No members yet</td>
+          </tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+    <!-- Settings Modal -->
+    <div class="modal fade" id="settingsModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content bg-dark text-light border border-secondary">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-gear"></i> Settings</h5>
+            <button
+              type="button"
+              class="btn-close btn-close-white"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <h6>General</h6>
+                <div class="mb-2">
+                  <label class="form-label">Gym Name</label>
+                  <input
+                    id="setGymName"
+                    class="form-control"
+                    value="{{ gym_name }}"
+                  />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Currency Code</label>
+                  <input
+                    id="setCurrency"
+                    class="form-control"
+                    value="{{ currency_code }}"
+                  />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label">Monthly Price</label>
+                  <input
+                    id="setPrice"
+                    class="form-control"
+                    value="{{ monthly_price }}"
+                  />
+                </div>
+                <div class="mb-2">
+                  <label class="form-label"
+                    >WhatsApp Default Country Code</label
+                  >
+                  <input
+                    id="setWaCC"
+                    class="form-control"
+                    placeholder="e.g. 92"
+                  />
+                  <div class="form-text">
+                    Used when numbers are saved without a +country code.
+                  </div>
+                </div>
+                <button class="btn btn-primary" onclick="saveGeneralSettings()">
+                  Save General
+                </button>
+              </div>
+              <div class="col-md-6">
+                <h6>Brand Logo</h6>
+                <div class="mb-2">
+                  <img
+                    src="{{ logo_url or '' }}"
+                    alt="Logo"
+                    style="height: 48px"
+                    onerror="this.style.display='none'"
+                  />
+                </div>
+                <div class="mb-2">
+                  <input
+                    id="logoFile"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    class="form-control"
+                  />
+                </div>
+                <button class="btn btn-secondary" onclick="uploadLogo()">
+                  Upload Logo
+                </button>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-outline-light"
+              data-bs-dismiss="modal"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+            const DEFAULT_CC = "{{ default_cc }}";
+            const CC_TO_ISO = {
+              92: "PK",
+              91: "IN",
+              1: "US",
+              44: "GB",
+              971: "AE",
+              974: "QA",
+              966: "SA",
+              880: "BD",
+              977: "NP",
+              94: "LK",
+              60: "MY",
+              65: "SG",
+              61: "AU",
+              81: "JP",
+              49: "DE",
+              33: "FR",
+              39: "IT",
+              86: "CN",
+              7: "RU",
+              34: "ES",
+              351: "PT",
+              41: "CH",
+              31: "NL",
+              90: "TR",
+              20: "EG",
+              62: "ID",
+              63: "PH",
+              64: "NZ",
+              82: "KR",
+              55: "BR",
+              52: "MX",
+              27: "ZA",
+              972: "IL",
+              98: "IR",
+              964: "IQ",
+              965: "KW",
+              968: "OM",
+              973: "BH",
+              216: "TN",
+              213: "DZ",
+              254: "KE",
+              255: "TZ",
+              256: "UG",
+            };
+            function isoToFlag(iso) {
+              if (!iso) return "🌐";
+              const up = iso.toUpperCase();
+              return String.fromCodePoint(
+                ...[...up].map((c) => 127397 + c.charCodeAt(0))
+              );
+            }
+            function phoneToFlag(phone, defCC) {
+              if (!phone) {
+                return isoToFlag(CC_TO_ISO[defCC] || "");
+              }
+              let p = phone.trim();
+              if (p.startsWith("+")) {
+                p = p.slice(1);
+                for (let len of [3, 2, 1]) {
+                  const code = p.slice(0, len);
+                  if (CC_TO_ISO[code]) return isoToFlag(CC_TO_ISO[code]);
+                }
+                return "🌐";
+              }
+              return isoToFlag(CC_TO_ISO[defCC] || "");
+            }
+            async function saveGeneralSettings() {
+              const gym_name = document.getElementById("setGymName").value;
+              const currency_code = document.getElementById("setCurrency").value;
+              const monthly_price = document.getElementById("setPrice").value;
+              const whatsapp_default_country_code =
+                document.getElementById("setWaCC").value;
+              const res = await fetch("/admin/settings/general", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  gym_name,
+                  currency_code,
+                  monthly_price,
+                  whatsapp_default_country_code,
+                }),
+              });
+              const data = await res.json();
+              if (data.ok) {
+                alert("Saved");
+                location.reload();
+              } else {
+                alert("Failed: " + (data.error || "unknown"));
+              }
+            }
+            function updateDefaultFlag() {
+              const el = document.getElementById("defaultFlag");
+              if (el) el.textContent = isoToFlag(CC_TO_ISO[DEFAULT_CC] || "");
+            }
+            function updateWaToFlag() {
+              const input = document.getElementById("waTo");
+              const badge = document.getElementById("waToFlag");
+              if (!input || !badge) return;
+              badge.textContent = phoneToFlag(input.value, DEFAULT_CC);
+            }
+
+            async function uploadLogo() {
+              const f = document.getElementById("logoFile").files[0];
+              if (!f) {
+                alert("Select a logo file");
+                return;
+              }
+              const fd = new FormData();
+              fd.append("logo", f);
+              const res = await fetch("/admin/settings/logo", {
+                method: "POST",
+                body: fd,
+              });
+              const data = await res.json();
+              if (data.ok) {
+                alert("Logo uploaded");
+                location.reload();
+              } else {
+                alert("Upload failed: " + (data.error || "unknown"));
+              }
+            }
+            async function emailBackup() {
+              const res = await fetch("/admin/backup/email", { method: "POST" });
+              const data = await res.json();
+              if (data.ok) {
+                alert("Backup email sent");
+              } else {
+                alert("Failed: " + (data.error || "unknown error"));
+              }
+            }
+
+            async function driveBackup() {
+              const res = await fetch("/admin/backup/drive", { method: "POST" });
+              const data = await res.json();
+              if (data.ok) {
+                const link =
+                  data.file?.webViewLink || data.file?.webContentLink || "";
+                alert("Backup uploaded to Drive" + (link ? `\n${link}` : ""));
+              } else {
+                alert("Drive backup failed: " + (data.error || "unknown error"));
+              }
+            }
+            // Theme toggle
+            (function () {
+              const btn = document.getElementById("themeToggle");
+              if (!btn) return;
+              btn.addEventListener("click", function () {
+                const cur =
+                  document.documentElement.getAttribute("data-bs-theme") || "dark";
+                const next = cur === "dark" ? "light" : "dark";
+                document.documentElement.setAttribute("data-bs-theme", next);
+                try {
+                  localStorage.setItem("theme", next);
+                } catch (e) {}
+              });
+            })();
+
+            async function sendWaTest() {
+              const to = document.getElementById("waTo").value;
+              const message =
+                document.getElementById("waMsg").value || "Test message";
+              const res = await fetch("/admin/whatsapp/test", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ to, message }),
+              });
+              const data = await res.json();
+              if (data.ok) alert("Sent");
+              else alert("Failed: " + (data.error || "unknown"));
+            }
+
+            async function loadWaStatus() {
+              try {
+                const res = await fetch("/admin/whatsapp/status");
+                const st = await res.json();
+                const badge = document.getElementById("waCfgBadge");
+                if (st.ok) {
+                  badge.className = "badge text-bg-success";
+                  badge.textContent = `WhatsApp ready (default +${st.default_country_code})`;
+                } else {
+                  badge.className = "badge text-bg-danger";
+                  badge.textContent = `Missing: ${st.missing.join(", ")}`;
+                }
+              } catch (e) {
+                const badge = document.getElementById("waCfgBadge");
+                badge.className = "badge text-bg-warning";
+                badge.textContent = "Unable to check WhatsApp status";
+              }
+            }
+
+            let chart;
+            function initYear() {
+              const now = new Date();
+              document.getElementById("statYear").value = now.getFullYear();
+            }
+            async function loadStats() {
+              const y = document.getElementById("statYear").value;
+              const res = await fetch(`/api/stats/monthly?year=${y}`);
+              const stats = await res.json();
+              const labels = [
+                "Jan",
+                "Feb",
+                "Mar",
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+              ];
+              const data = {
+                labels,
+                datasets: [
+                  {
+                    label: "Paid",
+                    data: stats.paid,
+                    backgroundColor: "#19875488",
+                    borderColor: "#198754",
+                    borderWidth: 1,
+                  },
+                  {
+                    label: "Unpaid",
+                    data: stats.unpaid,
+                    backgroundColor: "#ffc10788",
+                    borderColor: "#ffc107",
+                    borderWidth: 1,
+                  },
+                  {
+                    label: "N/A",
+                    data: stats.na,
+                    backgroundColor: "#6c757d55",
+                    borderColor: "#6c757d",
+                    borderWidth: 1,
+                  },
+                ],
+              };
+              const ctx = document.getElementById("feesChart");
+              if (chart) {
+                chart.destroy();
+              }
+              chart = new Chart(ctx, {
+                type: "bar",
+                data,
+                options: {
+                  responsive: true,
+                  plugins: { legend: { position: "bottom" } },
+                },
+              });
+            }
+            initYear();
+            loadStats();
+            loadWaStatus();
+            async function loadCollected() {
+              try {
+                const res = await fetch(`/api/fees/summary`);
+                const js = await res.json();
+                if (js.ok) {
+                  document.getElementById("collectedAmt").textContent = (
+                    js.paid_total || 0
+                  ).toLocaleString();
+                }
+              } catch (e) {}
+            }
+            loadCollected();
+            updateDefaultFlag();
+            updateWaToFlag();
+            document.addEventListener("input", (e) => {
+              if (e.target && e.target.id === "waTo") {
+                updateWaToFlag();
+              }
+            });
+
+            // Onboarding: lightweight 2-step wizard built dynamically
+            function buildOnboardModal() {
+              const html = `
+      <div class="modal fade" id="onboardModal" tabindex="-1">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Quick Setup</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+              <div class="progress mb-3" style="height:6px;">
+                <div id="obProg" class="progress-bar" style="width:50%"></div>
+              </div>
+              <div id="obStep1">
+                <div class="mb-3">
+                  <label class="form-label">Gym Name</label>
+                  <input id="obName" class="form-control" placeholder="Your gym name" value="{{ gym_name }}"/>
+                </div>
+                <div class="row g-2">
+                  <div class="col-md-6">
+                    <label class="form-label">Currency</label>
+                    <input id="obCurrency" class="form-control" placeholder="USD" value="{{ currency_code }}"/>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Monthly Price</label>
+                    <input id="obPrice" class="form-control" placeholder="8" value="{{ monthly_price }}"/>
+                  </div>
+                </div>
+              </div>
+              <div id="obStep2" class="d-none">
+                <div class="mb-2">Features</div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" id="ft_whatsapp" checked>
+                  <label class="form-check-label" for="ft_whatsapp">WhatsApp Reminders</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" id="ft_backups" checked>
+                  <label class="form-check-label" for="ft_backups">Backups</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input" type="checkbox" id="ft_pdf" checked>
+                  <label class="form-check-label" for="ft_pdf">PDF Cards</label>
+                </div>
+                <hr/>
+                <label class="form-label">Upload Logo (optional)</label>
+                <input id="obLogo" type="file" class="form-control" accept="image/*"/>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-outline-secondary" id="obSkip">Skip</button>
+              <div class="ms-auto">
+                <button class="btn btn-secondary" id="obBack" disabled>Back</button>
+                <button class="btn btn-primary" id="obNext">Next</button>
+                <button class="btn btn-success d-none" id="obFinish">Finish</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>`;
+              const div = document.createElement("div");
+              div.innerHTML = html;
+              document.body.appendChild(div.firstElementChild);
+            }
+            let obStep = 1;
+            function obSetStep(n) {
+              obStep = n;
+              document.getElementById("obStep1").classList.toggle("d-none", n !== 1);
+              document.getElementById("obStep2").classList.toggle("d-none", n !== 2);
+              document.getElementById("obBack").disabled = n === 1;
+              document.getElementById("obNext").classList.toggle("d-none", n === 2);
+              document.getElementById("obFinish").classList.toggle("d-none", n !== 2);
+              document.getElementById("obProg").style.width = n * 50 + "%";
+            }
+            function setLoading(btn, loading, label){
+              if (!btn) return;
+              if (loading){
+                btn.disabled = true;
+                btn.dataset.label = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>' + (label || 'Working…');
+              } else {
+                btn.disabled = false;
+                if (btn.dataset.label) btn.innerHTML = btn.dataset.label;
+              }
+            }
+
+            async function obSaveLogo() {
+              const f = document.getElementById("obLogo")?.files?.[0];
+              if (!f) return;
+              const fd = new FormData();
+              fd.append("logo", f);
+              await fetch("/onboarding/logo", { method: "POST", body: fd });
+            }
+            async function obFinish() {
+              const features = [];
+              if (document.getElementById("ft_whatsapp").checked)
+                features.push("whatsapp");
+              if (document.getElementById("ft_backups").checked)
+                features.push("backups");
+              if (document.getElementById("ft_pdf").checked) features.push("pdf");
+              await obSaveLogo();
+              const payload = {
+                gym_name: document.getElementById("obName").value,
+                currency_code: document.getElementById("obCurrency").value,
+                monthly_price: document.getElementById("obPrice").value,
+                features,
+              };
+              const res = await fetch("/onboarding/complete", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+              });
+              if (res.ok) {
+                location.reload();
+              }
+            }
+            function downloadBackup(){
+              // Simple navigation to GET endpoint triggers browser download
+              window.location.href = '/admin/backup/download';
+            }
+            async function checkOnboarding() {
+              try {
+                const r = await fetch("/onboarding/status");
+                const js = await r.json();
+                if (js.ok && js.needed) {
+                  buildOnboardModal();
+                  const m = new bootstrap.Modal(
+                    document.getElementById("onboardModal"),
+                    { backdrop: "static", keyboard: false }
+                  );
+                  document
+                    .getElementById("obSkip")
+                    .addEventListener("click", async () => {
+                      await fetch("/onboarding/complete", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ skip: true }),
+                      });
+                      location.reload();
+                    });
+                  document
+                    .getElementById("obNext")
+                    .addEventListener("click", () =>
+                      obSetStep(Math.min(2, obStep + 1))
+                    );
+                  document
+                    .getElementById("obBack")
+                    .addEventListener("click", () =>
+                      obSetStep(Math.max(1, obStep - 1))
+                    );
+                  document
+                    .getElementById("obFinish")
+                    .addEventListener("click", obFinish);
+                  m.show();
+                }
+              } catch (e) {}
+            }
+            checkOnboarding();
+    </script>
+    <!-- Toast container -->
+    <div
+      id="toastArea"
+      class="toast-container position-fixed bottom-0 end-0 p-3"
+      style="z-index: 1080"
+    ></div>
+    <script>
+      function showToast(message, type) {
+        try {
+          const area = document.getElementById("toastArea");
+          const level = (type || "success").toLowerCase();
+          const cls =
+            level === "success"
+              ? "text-bg-success"
+              : level === "warning"
+              ? "text-bg-warning"
+              : level === "info"
+              ? "text-bg-info"
+              : "text-bg-danger";
+          const el = document.createElement("div");
+          el.className = `toast align-items-center ${cls} border-0`;
+          el.setAttribute("role", "alert");
+          el.setAttribute("aria-live", "assertive");
+          el.setAttribute("aria-atomic", "true");
+          el.innerHTML = `
+            <div class="d-flex">
+              <div class="toast-body">${message}</div>
+              <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>`;
+          area.appendChild(el);
+          const t = new bootstrap.Toast(el, { delay: 3500 });
+          t.show();
+          el.addEventListener("hidden.bs.toast", () => el.remove());
+        } catch (e) {
+          // Fallback
+          alert(message);
+        }
+      }
+
+      async function emailBackup() {
+        try {
+          const res = await fetch("/admin/backup/email", { method: "POST" });
+          let data = null;
+          try {
+            data = await res.json();
+          } catch {}
+          if (res.ok && data && data.ok) {
+            showToast("Backup sent to email successfully.", "success");
+          } else {
+            const msg = data && data.error ? data.error : `HTTP ${res.status}`;
+            showToast(
+              "Email backup failed: " + msg + " (check SMTP/env)",
+              "danger"
+            );
+          }
+        } catch (e) {
+          showToast(
+            "Email backup error: " + (e && e.message ? e.message : e),
+            "danger"
+          );
+        }
+      }
+      async function driveBackup() {
+        try {
+          const res = await fetch("/admin/backup/drive", { method: "POST" });
+          let data = null;
+          try {
+            data = await res.json();
+          } catch {}
+          if (res.ok && data && data.ok) {
+            showToast("Backup uploaded to Drive successfully.", "success");
+          } else {
+            const msg = data && data.error ? data.error : `HTTP ${res.status}`;
+            showToast(
+              "Drive backup failed: " + msg + " (check service account/folder)",
+              "danger"
+            );
+          }
+        } catch (e) {
+          showToast(
+            "Drive backup error: " + (e && e.message ? e.message : e),
+            "danger"
+          );
+        }
+      }
+    </script>
+    <script>
+      // Register Service Worker for Offline Support
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/static/service-worker.js")
+            .then((registration) => {
+              console.log(
+                "Service Worker registered successfully:",
+                registration.scope
+              );
+            })
+            .catch((error) => {
+              console.log("Service Worker registration failed:", error);
+            });
+        });
+      }
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

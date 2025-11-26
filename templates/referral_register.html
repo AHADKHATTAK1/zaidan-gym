@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ gym_name }} - Referral Registration</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="bg-dark text-light">
+    <nav class="navbar navbar-dark bg-dark border-bottom border-secondary mb-4">
+      <div class="container">
+        <a class="navbar-brand" href="/login"
+          ><strong>{{ gym_name }}</strong></a
+        >
+      </div>
+    </nav>
+    <div class="container" style="max-width: 720px">
+      <div class="card bg-secondary bg-opacity-25 border border-secondary">
+        <div class="card-body">
+          <h3 class="card-title mb-3">Join via Referral</h3>
+          {% if error %}
+          <div class="alert alert-danger">{{ error }}</div>
+          {% endif %} {% if success %}
+          <div class="alert alert-success">
+            Thanks! Your membership has been recorded.
+          </div>
+          {% else %} {% if referrer %}
+          <p class="text-muted">
+            Referred by: <strong>{{ referrer.name }}</strong> (S.No #{{ 1000 +
+            referrer.id }})
+          </p>
+          {% endif %}
+          <form method="post">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label class="form-label">Name</label>
+                <input name="name" class="form-control" required />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Phone</label>
+                <input
+                  name="phone"
+                  class="form-control"
+                  placeholder="03xx... or +92..."
+                />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Admission Date</label>
+                <input
+                  name="admission_date"
+                  type="date"
+                  class="form-control"
+                  required
+                />
+              </div>
+              <div class="col-md-6">
+                <label class="form-label">Plan Type</label>
+                <select class="form-select" name="plan_type">
+                  <option value="monthly" selected>Monthly</option>
+                  <option value="yearly">Yearly</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <button class="btn btn-primary" type="submit">Register</button>
+              </div>
+            </div>
+          </form>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

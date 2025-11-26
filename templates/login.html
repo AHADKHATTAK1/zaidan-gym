@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <title>Login - {{ gym_name }}</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/theme.css" />
+    <style>
+      /* Page-specific adjustments */
+      .card {
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.05);
+      }
+    </style>
+    {% if google_ready %}
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    {% endif %}
+  </head>
+  <body class="d-flex align-items-center" style="min-height: 100vh">
+    <div class="container">
+      <div class="row justify-content-center">
+        <div class="col-md-5 col-lg-10">
+          <div id="onboarding" class="mb-4" style="display: none">
+            <div class="card border border-secondary">
+              <div class="card-body">
+                <div
+                  class="d-flex justify-content-between align-items-center mb-2"
+                >
+                  <h5 class="mb-0">Quick Setup</h5>
+                  <button
+                    class="btn btn-sm btn-outline-secondary"
+                    onclick="skipOnboarding()"
+                  >
+                    Skip
+                  </button>
+                </div>
+                <div class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Gym Name</label>
+                    <input
+                      id="ob_gym_name"
+                      class="form-control"
+                      placeholder="Your Gym Name"
+                    />
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Purpose</label>
+                    <input
+                      id="ob_purpose"
+                      class="form-control"
+                      placeholder="e.g., Fitness training"
+                    />
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">Currency</label>
+                    <select id="ob_currency" class="form-select">
+                      <option>USD</option>
+                      <option>PKR</option>
+                      <option>INR</option>
+                      <option>EUR</option>
+                      <option>GBP</option>
+                      <option>AED</option>
+                      <option>SAR</option>
+                    </select>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">Monthly Price</label>
+                    <input
+                      id="ob_price"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      class="form-control"
+                      value="8"
+                    />
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Logo (optional)</label>
+                    <input
+                      id="ob_logo"
+                      type="file"
+                      accept="image/*"
+                      class="form-control"
+                    />
+                  </div>
+                  <div class="col-md-8">
+                    <label class="form-label">What do you want to see?</label>
+                    <div class="d-flex flex-wrap gap-3 small">
+                      <label
+                        ><input
+                          type="checkbox"
+                          class="form-check-input me-1"
+                          value="members"
+                          checked
+                        />
+                        Members</label
+                      >
+                      <label
+                        ><input
+                          type="checkbox"
+                          class="form-check-input me-1"
+                          value="fees"
+                          checked
+                        />
+                        Fees</label
+                      >
+                      <label
+                        ><input
+                          type="checkbox"
+                          class="form-check-input me-1"
+                          value="whatsapp"
+                        />
+                        WhatsApp</label
+                      >
+                      <label
+                        ><input
+                          type="checkbox"
+                          class="form-check-input me-1"
+                          value="backup"
+                        />
+                        Backup</label
+                      >
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3 d-flex gap-2">
+                  <button class="btn btn-primary" onclick="saveOnboarding()">
+                    Save & Continue
+                  </button>
+                  <button
+                    class="btn btn-outline-secondary"
+                    onclick="skipOnboarding()"
+                  >
+                    Skip for now
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4 col-lg-4">
+          <div class="card shadow-sm">
+            <div class="card-body">
+              <h3 class="mb-3 text-center">Sign in</h3>
+              {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %} {% for category, msg in messages %}
+              <div class="alert alert-{{category}}">{{msg}}</div>
+              {% endfor %} {% endif %} {% endwith %}
+              <form method="post">
+                <div class="mb-3">
+                  <label class="form-label">Username</label>
+                  <input class="form-control" name="username" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Password</label>
+                  <input
+                    class="form-control"
+                    name="password"
+                    type="password"
+                    required
+                  />
+                </div>
+                <button class="btn btn-primary w-100" type="submit">
+                  Login
+                </button>
+              </form>
+              <div class="text-center text-muted my-3">or</div>
+              {% if not google_ready %}
+              <div class="alert alert-danger py-2 small" role="alert">
+                Google login not configured. Missing:
+                <strong>{{ ', '.join(google_missing) }}</strong>. Use
+                username/password below or configure OAuth.
+              </div>
+              {% endif %} {% if google_ready %}
+              <div
+                id="g_id_onload"
+                data-client_id="{{ google_client_id }}"
+                data-context="signin"
+                data-ux_mode="popup"
+                data-callback="handleCredentialResponse"
+                data-auto_prompt="false"
+              ></div>
+              <div
+                class="g_id_signin"
+                data-type="standard"
+                data-size="large"
+                data-theme="outline"
+                data-text="signin_with"
+                data-shape="rect"
+                data-logo_alignment="left"
+              ></div>
+              <div class="text-center mt-2 small text-muted">
+                Or use the form above
+              </div>
+              {% else %}
+              <a
+                class="btn btn-outline-dark w-100 disabled"
+                href="#"
+                title="Configure GOOGLE_CLIENT_ID/SECRET in .env"
+              >
+                <img
+                  src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                  alt="Google"
+                  width="18"
+                  class="me-2"
+                />
+                Continue with Google
+              </a>
+              {% endif %}
+              <p class="text-muted mt-3 small">
+                Default admin is created on first run if none exists.
+              </p>
+              <div class="text-center mt-2">
+                <a href="/register" class="small">Create an account</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      async function loadOnboarding() {
+        try {
+          const r = await fetch("/onboarding/status");
+          const j = await r.json();
+          if (j.needed) {
+            document.getElementById("onboarding").style.display = "";
+            document.getElementById("ob_gym_name").value =
+              j.settings.gym_name || "";
+            document.getElementById("ob_purpose").value =
+              j.settings.gym_purpose || "";
+            document.getElementById("ob_currency").value =
+              j.settings.currency_code || "USD";
+            document.getElementById("ob_price").value =
+              j.settings.monthly_price || "8";
+          }
+        } catch {}
+      }
+      async function saveOnboarding() {
+        const name = document.getElementById("ob_gym_name").value.trim();
+        const purpose = document.getElementById("ob_purpose").value.trim();
+        const currency = document.getElementById("ob_currency").value;
+        const price = document.getElementById("ob_price").value;
+        // features
+        const checks = Array.from(
+          document.querySelectorAll("#onboarding input[type=checkbox]:checked")
+        ).map((x) => x.value);
+        // optional logo
+        const fileEl = document.getElementById("ob_logo");
+        const file = fileEl.files && fileEl.files[0];
+        if (file) {
+          const fd = new FormData();
+          fd.append("logo", file);
+          await fetch("/onboarding/logo", { method: "POST", body: fd });
+        }
+        await fetch("/onboarding/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            gym_name: name,
+            gym_purpose: purpose,
+            currency_code: currency,
+            monthly_price: price,
+            features: checks,
+          }),
+        });
+        location.reload();
+      }
+      async function skipOnboarding() {
+        await fetch("/onboarding/complete", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ skip: true }),
+        });
+        location.reload();
+      }
+      loadOnboarding();
+      {% if google_ready %}
+      window.handleCredentialResponse = async function(resp){
+        try{
+          const r = await fetch('/auth/google/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({credential: resp.credential})});
+          const j = await r.json();
+          if (j.ok){ window.location.href = '/dashboard'; }
+          else{ alert('Google sign-in failed: ' + (j.error || 'unknown')); }
+        }catch(e){ alert('Google sign-in error'); }
+      }
+      {% endif %}
+    </script>
+  </body>
+</html>

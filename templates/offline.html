@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline - Gym Management</title>
+    <link rel="stylesheet" href="/static/css/theme.css" />
+    <style>
+      body {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        text-align: center;
+        padding: 20px;
+      }
+      .offline-container {
+        max-width: 500px;
+      }
+      .offline-icon {
+        font-size: 5rem;
+        color: var(--amber);
+        margin-bottom: 20px;
+      }
+      h1 {
+        color: var(--charcoal);
+        margin-bottom: 15px;
+      }
+      p {
+        color: #666;
+        font-size: 1.1rem;
+        margin-bottom: 30px;
+      }
+      .btn {
+        font-weight: 700;
+        border-radius: 10px;
+        padding: 12px 24px;
+        background: linear-gradient(90deg, var(--emerald), var(--deep-green));
+        color: white;
+        border: none;
+        cursor: pointer;
+        text-decoration: none;
+        display: inline-block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="offline-container">
+      <div class="offline-icon">📡</div>
+      <h1>You're Offline</h1>
+      <p>
+        No internet connection. Don't worry, your data is safe and you can still
+        access cached pages.
+      </p>
+      <a href="/dashboard" class="btn">Go to Dashboard</a>
+    </div>
+  </body>
+</html>

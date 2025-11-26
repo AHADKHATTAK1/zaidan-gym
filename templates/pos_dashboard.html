@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>POS Dashboard - {{ gym_name }}</title>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --pos-primary: {{ primary_color }};
+      }
+      body {
+        min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(34, 197, 94, 0.15), transparent 45%), #020617;
+        color: #f8fafc;
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+      }
+      .glass-panel {
+        background: rgba(2, 6, 23, 0.78);
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 24px;
+        padding: 1.5rem;
+        box-shadow: 0 20px 45px rgba(2, 6, 23, 0.45);
+      }
+      .product-card {
+        background: rgba(15, 23, 42, 0.9);
+        border-radius: 18px;
+        padding: 1rem;
+        border: 1px solid rgba(148, 163, 184, 0.15);
+        min-width: 220px;
+      }
+      .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 1rem;
+      }
+      .product-grid.mobile-mode {
+        display: flex;
+        overflow-x: auto;
+        gap: 1rem;
+        scroll-snap-type: x mandatory;
+      }
+      .product-grid.mobile-mode .product-card {
+        min-width: 240px;
+        scroll-snap-align: center;
+      }
+      .btn-primary-green {
+        background: var(--pos-primary);
+        border: none;
+        color: #fff;
+      }
+      .btn-primary-green:hover {
+        background: #0f9f45;
+      }
+      .pos-badge {
+        border-radius: 999px;
+        padding: 0.25rem 0.75rem;
+      }
+      #mobileCartDrawer {
+        position: fixed;
+        bottom: -60vh;
+        left: 0;
+        right: 0;
+        background: rgba(2, 6, 23, 0.95);
+        border-top-left-radius: 24px;
+        border-top-right-radius: 24px;
+        padding: 1rem;
+        box-shadow: 0 -10px 30px rgba(2, 6, 23, 0.7);
+        transition: transform 0.3s ease;
+        z-index: 999;
+      }
+      #mobileCartDrawer.open {
+        transform: translateY(-60vh);
+      }
+      #mobileCheckoutBar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: var(--pos-primary);
+        color: #fff;
+        padding: 0.85rem 1.25rem;
+        display: none;
+        justify-content: space-between;
+        align-items: center;
+        z-index: 998;
+      }
+      body.mobile-mode #mobileCheckoutBar {
+        display: flex;
+      }
+      @media (max-width: 991px) {
+        .desktop-only {
+          display: none !important;
+        }
+        body.mobile-mode .glass-panel.cart-panel {
+          display: none;
+        }
+      }
+      .theme-panel {
+        position: fixed;
+        top: 50%;
+        right: 1.5rem;
+        transform: translateY(-50%);
+        width: 260px;
+        background: rgba(2, 6, 23, 0.9);
+        border-radius: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        padding: 1rem;
+        display: none;
+        z-index: 1200;
+      }
+      .theme-panel.show {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-xxl py-4">
+      <div
+        class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4"
+      >
+        <div>
+          <h2 class="mb-0">POS Dashboard</h2>
+          <small class="text-muted">{{ gym_name }}</small>
+        </div>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+          <span id="offlineBadge" class="pos-badge text-bg-success"
+            >Online</span
+          >
+          <button class="btn btn-sm btn-outline-light" id="themeToggle">
+            <i class="bi bi-palette"></i> Theme
+          </button>
+          <button class="btn btn-sm btn-outline-light" id="mobileToggle">
+            <i class="bi bi-phone"></i> Mobile Mode
+          </button>
+          <button class="btn btn-sm btn-outline-warning" id="syncBtn">
+            <i class="bi bi-arrow-repeat"></i> Sync Offline
+          </button>
+          <a class="btn btn-sm btn-outline-secondary" href="/pos/products"
+            >Products</a
+          >
+          <a class="btn btn-sm btn-outline-secondary" href="/pos/sales"
+            >Sales</a
+          >
+          <a class="btn btn-sm btn-outline-secondary" href="/pos/admin"
+            >Admin</a
+          >
+          <a class="btn btn-sm btn-outline-danger" href="/logout">Logout</a>
+        </div>
+      </div>
+
+      <section class="glass-panel mb-4">
+        <div
+          class="d-flex flex-wrap justify-content-between align-items-center gap-3"
+        >
+          <div>
+            <h5 class="mb-1">Upload CSV / Excel</h5>
+            <p class="mb-0 small text-muted">
+              Bulk import products (columns: name, price, stock, category, sku)
+            </p>
+          </div>
+          <div class="d-flex flex-wrap gap-2">
+            <input
+              type="file"
+              id="importFile"
+              class="form-control"
+              accept=".csv,.xlsx,.xls"
+            />
+            <button class="btn btn-primary-green" id="importBtn">
+              <i class="bi bi-cloud-upload"></i> Upload
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="row g-4">
+        <div class="col-lg-7">
+          <div class="glass-panel h-100">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h5 class="text-success mb-0">Product List</h5>
+              <input
+                class="form-control form-control-sm w-auto"
+                id="productSearch"
+                placeholder="Search products"
+              />
+            </div>
+            <div id="productList" class="product-grid"></div>
+          </div>
+        </div>
+        <div class="col-lg-5 desktop-only">
+          <div class="glass-panel cart-panel h-100 d-flex flex-column">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <h5 class="text-success mb-0">Cart</h5>
+              <button class="btn btn-sm btn-outline-light" id="clearCartBtn">
+                Clear
+              </button>
+            </div>
+            <div class="table-responsive flex-grow-1">
+              <table
+                class="table table-dark table-sm align-middle"
+                id="cartTable"
+              >
+                <thead>
+                  <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <div class="mt-3">
+              <div class="d-flex justify-content-between">
+                <span>Subtotal</span><strong id="subtotal">0</strong>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Tax</span
+                ><input
+                  type="number"
+                  id="taxInput"
+                  class="form-control form-control-sm w-50 text-end"
+                  value="0"
+                />
+              </div>
+              <div class="d-flex justify-content-between">
+                <span>Discount</span
+                ><input
+                  type="number"
+                  id="discountInput"
+                  class="form-control form-control-sm w-50 text-end"
+                  value="0"
+                />
+              </div>
+              <div class="d-flex justify-content-between fs-5 mt-2">
+                <span>Total</span><strong id="total">0</strong>
+              </div>
+              <input
+                class="form-control form-control-sm mt-2"
+                id="customerInput"
+                placeholder="Customer name (optional)"
+              />
+              <select
+                class="form-select form-select-sm mt-2"
+                id="paymentMethod"
+              >
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+                <option value="upi">UPI</option>
+              </select>
+              <button
+                class="btn btn-primary-green btn-lg w-100 mt-3"
+                id="checkoutBtn"
+              >
+                <i class="bi bi-credit-card"></i> Checkout
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="mobileCartDrawer">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h6 class="text-success mb-0">Cart</h6>
+          <button class="btn btn-sm btn-outline-light" id="closeDrawer">
+            <i class="bi bi-x"></i>
+          </button>
+        </div>
+        <div
+          class="table-responsive"
+          style="max-height: 35vh; overflow-y: auto"
+        >
+          <table
+            class="table table-dark table-sm align-middle"
+            id="mobileCartTable"
+          >
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="d-flex justify-content-between">
+          <span>Subtotal</span><strong id="mobileSubtotal">0</strong>
+        </div>
+      </div>
+      <div id="mobileCheckoutBar">
+        <div>
+          <small>Total</small>
+          <div id="mobileTotal">0</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-dark" id="openDrawer">
+            <i class="bi bi-bag"></i>
+          </button>
+          <button class="btn btn-light" id="mobileCheckoutBtn">Checkout</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="theme-panel" id="themePanel">
+      <h6>Theme Customization</h6>
+      <div class="mb-2">
+        <label class="form-label">Mode</label>
+        <select id="themeMode" class="form-select form-select-sm">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Primary Accent</label>
+        <div class="d-flex gap-2">
+          <button
+            class="btn btn-sm"
+            data-color="#16a34a"
+            style="background: #16a34a"
+          ></button>
+          <button
+            class="btn btn-sm"
+            data-color="#0ea5e9"
+            style="background: #0ea5e9"
+          ></button>
+          <button
+            class="btn btn-sm"
+            data-color="#f43f5e"
+            style="background: #f43f5e"
+          ></button>
+        </div>
+      </div>
+      <button class="btn btn-primary-green w-100" id="saveTheme">Save</button>
+    </div>
+
+    <script>
+      const CURRENCY = {{ currency_code|tojson }};
+      let products = {{ products|tojson }};
+      let cart = [];
+      const productListEl = document.getElementById('productList');
+      const cartTable = document.querySelector('#cartTable tbody');
+      const mobileCartTable = document.querySelector('#mobileCartTable tbody');
+      const subtotalEl = document.getElementById('subtotal');
+      const totalEl = document.getElementById('total');
+      const mobileSubtotalEl = document.getElementById('mobileSubtotal');
+      const mobileTotalEl = document.getElementById('mobileTotal');
+      const taxInput = document.getElementById('taxInput');
+      const discountInput = document.getElementById('discountInput');
+      const offlineBadge = document.getElementById('offlineBadge');
+      const themePanel = document.getElementById('themePanel');
+
+      function renderProducts(filter = '') {
+        const list = products.filter((p) => p.name.toLowerCase().includes(filter.toLowerCase()));
+        productListEl.innerHTML = list
+          .map(
+            (p) => `
+            <div class="product-card">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div>
+                  <strong>${p.name}</strong>
+                  <div class="small text-muted">${p.category || 'General'}</div>
+                </div>
+                <span class="badge text-bg-dark">${CURRENCY} ${p.price.toFixed(2)}</span>
+              </div>
+              <div class="small text-muted mb-2">Stock: ${p.stock}</div>
+              <button class="btn btn-sm btn-primary-green w-100" data-id="${p.id}">
+                <i class="bi bi-plus"></i> Add
+              </button>
+            </div>`
+          )
+          .join('');
+        productListEl.querySelectorAll('button').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const product = products.find((p) => p.id === Number(btn.dataset.id));
+            if (product) addToCart(product);
+          });
+        });
+      }
+
+      function addToCart(product) {
+        const item = cart.find((c) => c.id === product.id);
+        if (item) item.quantity += 1;
+        else cart.push({ ...product, quantity: 1 });
+        saveCart();
+        renderCart();
+      }
+
+      function updateQuantity(id, qty) {
+        const item = cart.find((c) => c.id === id);
+        if (!item) return;
+        item.quantity = Math.max(1, qty);
+        saveCart();
+        renderCart();
+      }
+
+      function removeFromCart(id) {
+        cart = cart.filter((c) => c.id !== id);
+        saveCart();
+        renderCart();
+      }
+
+      function renderCart() {
+        const rows = cart
+          .map(
+            (item) => `
+          <tr>
+            <td>${item.name}</td>
+            <td><input type="number" min="1" value="${item.quantity}" class="form-control form-control-sm" data-qty="${item.id}" /></td>
+            <td>${(item.price * item.quantity).toFixed(2)}</td>
+            <td><button class="btn btn-sm btn-outline-danger" data-remove="${item.id}"><i class="bi bi-x"></i></button></td>
+          </tr>`
+          )
+          .join('');
+        cartTable.innerHTML = rows || '<tr><td colspan="4" class="text-muted">No items</td></tr>';
+        mobileCartTable.innerHTML = rows || '<tr><td class="text-muted">No items</td></tr>';
+        cartTable.querySelectorAll('input[data-qty]').forEach((inp) => {
+          inp.addEventListener('input', () => updateQuantity(Number(inp.dataset.qty), Number(inp.value)));
+        });
+        cartTable.querySelectorAll('button[data-remove]').forEach((btn) => btn.addEventListener('click', () => removeFromCart(Number(btn.dataset.remove))));
+        mobileCartTable.querySelectorAll('input[data-qty]').forEach((inp) => {
+          inp.addEventListener('input', () => updateQuantity(Number(inp.dataset.qty), Number(inp.value)));
+        });
+        mobileCartTable.querySelectorAll('button[data-remove]').forEach((btn) => btn.addEventListener('click', () => removeFromCart(Number(btn.dataset.remove))));
+        updateTotals();
+      }
+
+      function updateTotals() {
+        const subtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        subtotalEl.textContent = `${CURRENCY} ${subtotal.toFixed(2)}`;
+        mobileSubtotalEl.textContent = `${CURRENCY} ${subtotal.toFixed(2)}`;
+        const tax = Number(taxInput.value || 0);
+        const discount = Number(discountInput.value || 0);
+        const total = subtotal + tax - discount;
+        totalEl.textContent = `${CURRENCY} ${total.toFixed(2)}`;
+        mobileTotalEl.textContent = `${CURRENCY} ${total.toFixed(2)}`;
+      }
+
+      function saveCart() {
+        localStorage.setItem('posCart', JSON.stringify(cart));
+      }
+
+      function loadCart() {
+        try {
+          cart = JSON.parse(localStorage.getItem('posCart')) || [];
+        } catch (err) {
+          cart = [];
+        }
+      }
+
+      async function checkout() {
+        if (!cart.length) {
+          alert('Cart is empty');
+          return;
+        }
+        const payload = {
+          items: cart.map((item) => ({ id: item.id, name: item.name, price: item.price, quantity: item.quantity })),
+          tax: Number(taxInput.value || 0),
+          discount: Number(discountInput.value || 0),
+          customer_name: document.getElementById('customerInput').value,
+          payment_method: document.getElementById('paymentMethod').value,
+        };
+        if (!navigator.onLine) {
+          queueOfflineOrder(payload);
+          cart = [];
+          saveCart();
+          renderCart();
+          alert('Offline — order queued for sync.');
+          return;
+        }
+        const res = await fetch('/api/checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          cart = [];
+          saveCart();
+          renderCart();
+          window.open(`/pos/receipt/${data.sale.id}`, '_blank');
+        } else {
+          alert(data.error || 'Checkout failed');
+        }
+      }
+
+      function queueOfflineOrder(order) {
+        const list = JSON.parse(localStorage.getItem('offlineOrders') || '[]');
+        list.push({ ...order, created_at: new Date().toISOString() });
+        localStorage.setItem('offlineOrders', JSON.stringify(list));
+        updateOfflineBadge();
+      }
+
+      async function syncOfflineOrders() {
+        const list = JSON.parse(localStorage.getItem('offlineOrders') || '[]');
+        if (!list.length) {
+          alert('No offline orders to sync');
+          return;
+        }
+        const res = await fetch('/api/offline-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orders: list }),
+        });
+        const data = await res.json();
+        if (data.ok) {
+          localStorage.removeItem('offlineOrders');
+          updateOfflineBadge();
+          alert('Offline orders synced');
+        } else {
+          alert('Sync failed');
+        }
+      }
+
+      function updateOfflineBadge() {
+        const queued = JSON.parse(localStorage.getItem('offlineOrders') || '[]').length;
+        if (!navigator.onLine) {
+          offlineBadge.textContent = `Offline (${queued})`;
+          offlineBadge.className = 'pos-badge text-bg-danger';
+        } else if (queued) {
+          offlineBadge.textContent = `Pending Sync (${queued})`;
+          offlineBadge.className = 'pos-badge text-bg-warning';
+        } else {
+          offlineBadge.textContent = 'Online';
+          offlineBadge.className = 'pos-badge text-bg-success';
+        }
+      }
+
+      function toggleThemePanel() {
+        themePanel.classList.toggle('show');
+      }
+
+      function loadTheme() {
+        const mode = localStorage.getItem('posThemeMode') || 'dark';
+        document.documentElement.setAttribute('data-bs-theme', mode);
+        document.body.classList.toggle('text-dark', mode === 'light');
+        document.body.classList.toggle('text-light', mode !== 'light');
+        document.getElementById('themeMode').value = mode;
+        const color = localStorage.getItem('posPrimaryColor') || getComputedStyle(document.documentElement).getPropertyValue('--pos-primary');
+        document.documentElement.style.setProperty('--pos-primary', color);
+      }
+
+      document.getElementById('saveTheme').addEventListener('click', () => {
+        const mode = document.getElementById('themeMode').value;
+        localStorage.setItem('posThemeMode', mode);
+        document.documentElement.setAttribute('data-bs-theme', mode);
+        const color = document.documentElement.style.getPropertyValue('--pos-primary');
+        localStorage.setItem('posPrimaryColor', color);
+        toggleThemePanel();
+      });
+
+      document.querySelectorAll('.theme-panel button[data-color]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          document.documentElement.style.setProperty('--pos-primary', btn.dataset.color);
+        });
+      });
+
+      document.getElementById('themeToggle').addEventListener('click', toggleThemePanel);
+      document.getElementById('checkoutBtn').addEventListener('click', checkout);
+      document.getElementById('mobileCheckoutBtn').addEventListener('click', checkout);
+      document.getElementById('clearCartBtn').addEventListener('click', () => {
+        cart = [];
+        saveCart();
+        renderCart();
+      });
+      document.getElementById('syncBtn').addEventListener('click', syncOfflineOrders);
+      document.getElementById('productSearch').addEventListener('input', (e) => renderProducts(e.target.value));
+      document.getElementById('importBtn').addEventListener('click', async () => {
+        const file = document.getElementById('importFile').files[0];
+        if (!file) {
+          alert('Choose a file first');
+          return;
+        }
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/api/products/import', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.ok) {
+          alert(`Imported ${data.created} products`);
+          fetchProducts();
+        } else {
+          alert(data.error || 'Import failed');
+        }
+      });
+
+      async function fetchProducts() {
+        const res = await fetch('/api/products?active=1');
+        products = await res.json();
+        renderProducts(document.getElementById('productSearch').value);
+      }
+
+      document.getElementById('taxInput').addEventListener('input', updateTotals);
+      document.getElementById('discountInput').addEventListener('input', updateTotals);
+      document.getElementById('mobileToggle').addEventListener('click', () => {
+        document.body.classList.toggle('mobile-mode');
+      });
+      document.getElementById('openDrawer').addEventListener('click', () => {
+        document.getElementById('mobileCartDrawer').classList.add('open');
+      });
+      document.getElementById('closeDrawer').addEventListener('click', () => {
+        document.getElementById('mobileCartDrawer').classList.remove('open');
+      });
+
+      window.addEventListener('online', updateOfflineBadge);
+      window.addEventListener('offline', updateOfflineBadge);
+
+      function loadOfflineOrdersBadge() {
+        updateOfflineBadge();
+      }
+
+      loadCart();
+      renderCart();
+      renderProducts();
+      loadTheme();
+      fetchProducts();
+      loadOfflineOrdersBadge();
+    </script>
+  </body>
+</html>

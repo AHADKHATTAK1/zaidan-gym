@@ -1,0 +1,26 @@
+{
+  "name": "Gym Management System",
+  "short_name": "Gym POS",
+  "description": "Premium Gym Management & POS System",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#F4F7FA",
+  "theme_color": "#00C46C",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "prefer_related_applications": false
+}
