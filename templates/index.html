@@ -67,12 +67,12 @@
               type="file"
               id="csvfile"
               name="file"
-              aria-label="CSV file to import"
-              title="Select CSV file"
-              accept=".csv"
+              aria-label="Excel or CSV file to import"
+              title="Select Excel (.xlsx, .xls, .xltm) or CSV file"
+              accept=".csv,.xlsx,.xls,.xltm"
             />
             <button class="btn btn-sm btn-outline-secondary" type="submit">
-              <i class="bi bi-upload"></i> Import CSV
+              <i class="bi bi-upload"></i> Import Excel/CSV
             </button>
           </form>
         </div>
@@ -1147,21 +1147,45 @@
           e.preventDefault();
           const file = document.getElementById("csvfile").files[0];
           if (!file) {
-            alert("Select a CSV file first");
+            alert("Please select an Excel or CSV file first");
             return;
           }
+          
+          const btn = e.target.querySelector('button[type="submit"]');
+          const originalText = btn.innerHTML;
+          btn.disabled = true;
+          btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Importing...';
+          
           const fd = new FormData();
           fd.append("file", file);
-          const res = await fetch("/admin/members/upload", {
-            method: "POST",
-            body: fd,
-          });
-          const data = await res.json();
-          if (data.ok) {
-            alert("Imported " + data.created + " members");
-            fetchMembers();
-          } else {
-            alert("Upload failed: " + (data.error || "unknown error"));
+          
+          try {
+            const res = await fetch("/admin/members/upload", {
+              method: "POST",
+              body: fd,
+            });
+            const data = await res.json();
+            
+            if (data.ok) {
+              let msg = `✅ Successfully imported ${data.created} member(s)`;
+              if (data.skipped > 0) {
+                msg += `\n⚠️ Skipped ${data.skipped} (duplicates or invalid data)`;
+              }
+              if (data.columns_detected) {
+                const detected = Object.keys(data.columns_detected).join(', ');
+                msg += `\n📋 Auto-detected columns: ${detected}`;
+              }
+              alert(msg);
+              document.getElementById("csvfile").value = '';
+              fetchMembers();
+            } else {
+              alert("❌ Upload failed: " + (data.error || "unknown error"));
+            }
+          } catch (err) {
+            alert("❌ Upload failed: " + err.message);
+          } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
           }
         });
 

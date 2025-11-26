@@ -1667,54 +1667,151 @@ def schedule_run_now():
     status = 200 if res.get('ok') else 400
     return jsonify(res), status
 
+def _smart_column_mapper(df_columns):
+    """Automatically map Excel/CSV columns to database fields"""
+    column_map = {}
+    
+    # Column mapping patterns (case-insensitive)
+    patterns = {
+        'name': ['name', 'member name', 'full name', 'fullname', 'student name', 'naam', 'نام'],
+        'phone': ['phone', 'mobile', 'contact', 'number', 'phone number', 'mobile number', 'whatsapp', 'contact number', 'رابطہ'],
+        'email': ['email', 'e-mail', 'mail', 'ای میل'],
+        'admission_date': ['admission', 'admission date', 'join date', 'joining date', 'date', 'start date', 'reg date', 'registration date', 'داخلہ'],
+        'plan_type': ['plan', 'plan type', 'subscription', 'package', 'پلان'],
+        'access_tier': ['access', 'tier', 'access tier', 'level', 'رسائی'],
+        'training_type': ['training', 'training type', 'workout', 'workout type', 'تربیت'],
+        'special_tag': ['special', 'special tag', 'vip', 'star', 'خاص'],
+    }
+    
+    df_cols_lower = {col.lower().strip(): col for col in df_columns}
+    
+    for field, possible_names in patterns.items():
+        for poss in possible_names:
+            if poss in df_cols_lower:
+                column_map[field] = df_cols_lower[poss]
+                break
+    
+    return column_map
+
 @app.route('/admin/members/upload', methods=['POST'])
 @admin_required
 def upload_members_csv():
     if 'file' not in request.files:
         return jsonify({"ok": False, "error": "No file uploaded"}), 400
     f = request.files['file']
-    if not f.filename.lower().endswith(('.csv',)):
-        return jsonify({"ok": False, "error": "Only CSV files are supported"}), 400
+    fname_lower = f.filename.lower()
+    
+    # Support CSV, Excel (.xlsx, .xls), and .xltm
+    if not fname_lower.endswith(('.csv', '.xlsx', '.xls', '.xltm')):
+        return jsonify({"ok": False, "error": "Supported formats: CSV, Excel (.xlsx, .xls, .xltm)"}), 400
+    
     try:
-        df = pd.read_csv(f)
+        if fname_lower.endswith('.csv'):
+            df = pd.read_csv(f)
+        else:
+            # Excel formats
+            df = pd.read_excel(f, engine='openpyxl' if fname_lower.endswith(('.xlsx', '.xltm')) else None)
     except Exception as e:
-        return jsonify({"ok": False, "error": f"Failed to parse CSV: {e}"}), 400
+        return jsonify({"ok": False, "error": f"Failed to parse file: {str(e)}"}), 400
+    
+    # Automatic column mapping
+    col_map = _smart_column_mapper(df.columns.tolist())
+    
     created = 0
-    for _, row in df.iterrows():
-        name = str(row.get('name') or '').strip()
-        phone = str(row.get('phone') or '').strip()
-        admission = str(row.get('admission_date') or '').strip()
-        plan_type = str(row.get('plan_type') or 'monthly').lower().strip()
-        access_tier = str(row.get('access_tier') or 'standard').lower().strip()
-        email = str(row.get('email') or '').strip()
-        training_type = str(row.get('training_type') or 'standard').lower().strip()
-        special_tag_raw = str(row.get('special_tag') or '').strip().lower()
-        special_tag = special_tag_raw in ('1','true','yes','y')
-        if not (name and admission):
-            continue
+    skipped = 0
+    errors = []
+    
+    for idx, row in df.iterrows():
         try:
-            admission_date = datetime.fromisoformat(admission).date()
-        except Exception:
-            # try dd/mm/yyyy
-            try:
-                admission_date = datetime.strptime(admission, '%d/%m/%Y').date()
-            except Exception:
+            # Extract data using smart mapping
+            name = str(row.get(col_map.get('name')) or '').strip() if 'name' in col_map else ''
+            phone = str(row.get(col_map.get('phone')) or '').strip() if 'phone' in col_map else ''
+            admission = str(row.get(col_map.get('admission_date')) or '').strip() if 'admission_date' in col_map else ''
+            plan_type = str(row.get(col_map.get('plan_type')) or 'monthly').lower().strip() if 'plan_type' in col_map else 'monthly'
+            access_tier = str(row.get(col_map.get('access_tier')) or 'standard').lower().strip() if 'access_tier' in col_map else 'standard'
+            email = str(row.get(col_map.get('email')) or '').strip() if 'email' in col_map else ''
+            training_type = str(row.get(col_map.get('training_type')) or 'standard').lower().strip() if 'training_type' in col_map else 'standard'
+            special_tag_raw = str(row.get(col_map.get('special_tag')) or '').strip().lower() if 'special_tag' in col_map else ''
+            special_tag = special_tag_raw in ('1','true','yes','y', 'vip', '⭐')
+            
+            if not name:
+                skipped += 1
                 continue
-        if plan_type not in ('monthly','yearly'):
-            plan_type = 'monthly'
-        if access_tier not in ('standard','unlimited'):
-            access_tier = 'standard'
-        if training_type not in ('standard','personal','cardio'):
-            training_type = 'standard'
-        m = Member(name=name, phone=phone, email=email or None, training_type=training_type, special_tag=special_tag, admission_date=admission_date, plan_type=plan_type, access_tier=access_tier, referral_code=_gen_referral_code())
-        db.session.add(m)
-        db.session.commit()
-        for mm in range(1, 12 + 1):
-            status = "N/A" if datetime(admission_date.year, mm, 1).date() < admission_date else "Unpaid"
-            db.session.add(Payment(member_id=m.id, year=admission_date.year, month=mm, status=status))
-        db.session.commit()
-        created += 1
-    return jsonify({"ok": True, "created": created})
+            
+            # Parse admission date with multiple formats
+            admission_date = None
+            if admission:
+                for date_format in ['%Y-%m-%d', '%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%Y/%m/%d']:
+                    try:
+                        admission_date = datetime.strptime(admission, date_format).date()
+                        break
+                    except:
+                        continue
+                        
+                if not admission_date:
+                    try:
+                        admission_date = datetime.fromisoformat(admission).date()
+                    except:
+                        pass
+            
+            if not admission_date:
+                admission_date = datetime.now(timezone.utc).date()
+            
+            # Normalize enums
+            if plan_type not in ('monthly','yearly'):
+                plan_type = 'monthly'
+            if access_tier not in ('standard','unlimited'):
+                access_tier = 'standard'
+            if training_type not in ('standard','personal','cardio'):
+                training_type = 'standard'
+            
+            # Check for duplicate by phone or name
+            existing = None
+            if phone:
+                existing = Member.query.filter_by(phone=phone).first()
+            if not existing and name:
+                existing = Member.query.filter_by(name=name).first()
+            
+            if existing:
+                skipped += 1
+                continue
+            
+            m = Member(
+                name=name, 
+                phone=phone, 
+                email=email or None, 
+                training_type=training_type, 
+                special_tag=special_tag, 
+                admission_date=admission_date, 
+                plan_type=plan_type, 
+                access_tier=access_tier, 
+                referral_code=_gen_referral_code()
+            )
+            db.session.add(m)
+            db.session.commit()
+            
+            # Create payment records
+            for mm in range(1, 12 + 1):
+                status = "N/A" if datetime(admission_date.year, mm, 1).date() < admission_date else "Unpaid"
+                db.session.add(Payment(member_id=m.id, year=admission_date.year, month=mm, status=status))
+            db.session.commit()
+            created += 1
+            
+        except Exception as e:
+            errors.append(f"Row {idx + 2}: {str(e)}")
+            skipped += 1
+            continue
+    
+    response = {
+        "ok": True, 
+        "created": created, 
+        "skipped": skipped,
+        "columns_detected": col_map
+    }
+    if errors and len(errors) <= 5:
+        response['errors'] = errors
+    
+    return jsonify(response)
 
 # WhatsApp Cloud API helper
 def _normalize_phone(phone: str) -> str:
