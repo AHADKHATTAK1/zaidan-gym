@@ -1,12 +1,25 @@
 # Netlify Deployment Guide - ZAIDAN FITNESS RECORD
 
+## ⚠️ **IMPORTANT: Use Render.com Instead (Recommended)**
+
+**Netlify has limitations for Flask apps:**
+
+- ❌ Complex Python version issues (as shown in your build error)
+- ❌ No persistent database storage (SQLite will be lost on redeploy)
+- ❌ Serverless function cold starts are very slow
+- ❌ More complicated setup
+
+**👉 See `RENDER_DEPLOYMENT.md` for the better deployment option!**
+
+---
+
 ## 📦 Deployment Files Created
 
 ✅ `netlify.toml` - Netlify configuration
 ✅ `functions/api.py` - Serverless function wrapper
 ✅ Requirements already in `requirements.txt`
 
-## 🚀 Deployment Steps
+## 🚀 Deployment Steps (If you still want to use Netlify)
 
 ### Option 1: Netlify CLI (Recommended)
 
