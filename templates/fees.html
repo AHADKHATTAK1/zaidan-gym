@@ -213,6 +213,7 @@
                 <th>#</th>
                 <th>Name</th>
                 <th>Phone</th>
+                <th>Action</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -250,6 +251,26 @@
           <div class="modal-footer">
             <button class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
             <button id="payConfirmBtn" class="btn btn-success" data-member-id="" data-year="" data-month="">Confirm & Slip</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Member Monthly Detail Modal -->
+    <div class="modal fade" id="memberDetailModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light border border-info">
+          <div class="modal-header">
+            <h5 class="modal-title"><i class="bi bi-list-check"></i> Monthly Details</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+          </div>
+          <div class="modal-body">
+            <div id="memberDetailBody">
+              <div class="text-muted">Loading…</div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
           </div>
         </div>
       </div>
@@ -318,15 +339,11 @@
           const tr = document.createElement("tr");
           const phoneRaw = r.member.phone || "";
           const flag = phoneToFlag(phoneRaw, DEFAULT_CC);
-          tr.innerHTML = `<td>${r.member.serial}</td><td>${
-            r.member.name
-          }</td><td>${flag} ${phoneRaw}</td>
+          tr.innerHTML = `<td>${r.member.serial}</td><td>${r.member.name}</td><td>${flag} ${phoneRaw}</td>
             <td>
-              <button class="btn btn-sm btn-outline-success" onclick="remindSingle(${\
-                r.member.id\
-              })">Remind</button>
-              <button class="btn btn-sm btn-success ms-1" onclick="openPayModal(${\
-                r.member.id}, ${y}, ${m})"><i class="bi bi-cash-coin"></i> Pay & Slip</button>
+              <button class="btn btn-sm btn-outline-success" onclick="remindSingle(${r.member.id})">Remind</button>
+              <button class="btn btn-sm btn-outline-light ms-1" onclick="openMemberDetail(${r.member.id})"><i class="bi bi-list-check"></i> Detail</button>
+              <button class="btn btn-sm btn-success ms-1" onclick="openPayModal(${r.member.id}, ${y}, ${m})"><i class="bi bi-cash-coin"></i> Pay & Slip</button>
             </td>`;
           upT.appendChild(tr);
         });
@@ -334,9 +351,10 @@
           const tr = document.createElement("tr");
           const phoneRaw = r.member.phone || "";
           const flag = phoneToFlag(phoneRaw, DEFAULT_CC);
-          tr.innerHTML = `<td>${r.member.serial}</td><td>${
-            r.member.name
-          }</td><td>${flag} ${phoneRaw}</td>`;
+          tr.innerHTML = `<td>${r.member.serial}</td><td>${r.member.name}</td><td>${flag} ${phoneRaw}</td>
+            <td>
+              <button class="btn btn-sm btn-outline-light" onclick="openMemberDetail(${r.member.id})"><i class="bi bi-list-check"></i> Detail</button>
+            </td>`;
           pT.appendChild(tr);
         });
       }
@@ -499,6 +517,91 @@
           }
         });
       })();
+
+      // Member Detail Functions
+      let memberDetailInstance;
+      function monthName(n){
+        const names=['January','February','March','April','May','June','July','August','September','October','November','December'];
+        return names[(n-1) % 12];
+      }
+      async function openMemberDetail(memberId){
+        const el = document.getElementById('memberDetailModal');
+        if(!memberDetailInstance){ memberDetailInstance = new bootstrap.Modal(el); }
+        memberDetailInstance.show();
+        const body = document.getElementById('memberDetailBody');
+        body.innerHTML = '<div class="text-muted">Loading…</div>';
+        try{
+          const res = await fetch(`/api/members/${memberId}/payments`);
+          const rows = await res.json();
+          if(!Array.isArray(rows)){
+            body.innerHTML = '<div class="text-danger">Failed to load payments.</div>';
+            return;
+          }
+          const nowY = parseInt(document.getElementById('year').value || String(new Date().getFullYear()));
+          const wrap = document.createElement('div');
+          wrap.className = 'table-responsive';
+          const tbl = document.createElement('table');
+          tbl.className = 'table table-sm align-middle';
+          tbl.innerHTML = `<thead><tr><th>Year</th><th>Month</th><th>Status</th><th>Amount</th><th>Actions</th></tr></thead>`;
+          const tb = document.createElement('tbody');
+          rows.forEach(p=>{
+            const tr = document.createElement('tr');
+            const badge = p.status==='Paid' ? '<span class="badge text-bg-success">Paid</span>' : p.status==='Unpaid' ? '<span class="badge text-bg-warning">Unpaid</span>' : '<span class="badge text-bg-secondary">N/A</span>';
+            tr.innerHTML = `<td>${p.year}</td><td>${monthName(p.month)}</td><td>${badge}</td>
+              <td><input type="number" class="form-control form-control-sm" min="0" step="0.01" placeholder="Amount" data-amt-for="${p.id}" /></td>
+              <td>
+                <button class="btn btn-sm btn-success me-1" ${p.status==='N/A'?'disabled':''} onclick="markPaidFor(${memberId}, ${p.year}, ${p.month}, ${p.id})"><i class="bi bi-cash-coin"></i> Mark Paid</button>
+                <button class="btn btn-sm btn-outline-warning" ${p.status==='N/A'?'disabled':''} onclick="markUnpaid(${p.id})"><i class="bi bi-x-circle"></i> Mark Unpaid</button>
+              </td>`;
+            tb.appendChild(tr);
+          });
+          tbl.appendChild(tb);
+          wrap.appendChild(tbl);
+          body.innerHTML='';
+          body.appendChild(wrap);
+        } catch(e){
+          body.innerHTML = '<div class="text-danger">Error loading details.</div>';
+        }
+      }
+
+      async function markPaidFor(memberId, year, month, paymentId){
+        // Read amount from input (optional)
+        const input = document.querySelector(`input[data-amt-for='${paymentId}']`);
+        const val = input && input.value ? parseFloat(input.value) : undefined;
+        const payload = { member_id: memberId, year, month, method: 'cash' };
+        if(typeof val === 'number' && !Number.isNaN(val)) payload.amount = val;
+        try{
+          const btn = event && event.target && event.target.closest('button');
+          if(btn) setLoading(btn, true, 'Marking…');
+          const res = await fetch('/api/fees/mark-paid', {
+            method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(payload)
+          });
+          const data = await res.json();
+          if(res.ok && data && data.ok){
+            showToast('Marked as Paid', 'success');
+            refreshAll();
+            openMemberDetail(memberId);
+          } else {
+            showToast('Failed to mark paid', 'danger');
+          }
+        } catch(e){ showToast('Error marking paid', 'danger'); }
+      }
+
+      async function markUnpaid(paymentId){
+        try{
+          const btn = event && event.target && event.target.closest('button');
+          if(btn) setLoading(btn, true, 'Updating…');
+          const res = await fetch(`/api/payments/${paymentId}`, {
+            method: 'PUT', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ status: 'Unpaid' })
+          });
+          if(res.ok){
+            showToast('Marked as Unpaid', 'warning');
+            refreshAll();
+          } else {
+            showToast('Failed to mark unpaid', 'danger');
+          }
+        } catch(e){ showToast('Error marking unpaid', 'danger'); }
+      }
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
   </body>

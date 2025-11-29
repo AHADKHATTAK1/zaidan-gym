@@ -81,32 +81,37 @@
 
       <div class="row g-3 mb-4">
         <div class="col-12 mb-2 d-flex gap-2">
-          <!-- <button
-            id="btnEmailBackup"
-            class="btn btn-outline-primary btn-sm"
-            onclick="emailBackup()"
+          <button
+            class="btn btn-outline-warning btn-sm"
+            data-bs-toggle="modal"
+            data-bs-target="#backupManagerModal"
+            title="Manage system backups"
           >
-            <i class="bi bi-envelope-paper me-1"></i>Email Backup
-          </button> -->
-          <!-- <button
-            id="btnDriveBackup"
+            <i class="bi bi-database me-1"></i>Backup Manager
+          </button>
+          <button
+            id="btnCreateBackup"
             class="btn btn-outline-success btn-sm"
-            onclick="driveBackup()"
+            onclick="createBackup()"
+            title="Create new backup now"
           >
-            <i class="bi bi-google-drive me-1"></i>Drive Backup
-          </button> -->
-          <!-- <button
+            <i class="bi bi-cloud-arrow-up me-1"></i>Create Backup
+          </button>
+          <button
             id="btnDownloadBackup"
             class="btn btn-outline-secondary btn-sm"
             onclick="downloadBackup()"
           >
             <i class="bi bi-download me-1"></i>Download Backup
-          </button> -->
+          </button>
           <a class="btn btn-outline-secondary btn-sm" href="/members"
             ><i class="bi bi-people me-1"></i>Manage Members</a
           >
           <a class="btn btn-outline-success btn-sm" href="/fees"
             ><i class="bi bi-cash-coin me-1"></i>Monthly Fees</a
+          >
+          <a class="btn btn-outline-primary btn-sm" href="/dashboard/excel"
+            ><i class="bi bi-file-earmark-excel me-1"></i>Excel Dashboard</a
           >
           <button
             class="btn btn-outline-info btn-sm"
@@ -120,6 +125,7 @@
             id="btnSystemReset"
             class="btn btn-outline-danger btn-sm"
             title="Reset system to factory defaults"
+            onclick="confirmSystemReset()"
           >
             <i class="bi bi-exclamation-triangle me-1"></i>System Reset
           </button>
@@ -797,6 +803,52 @@
       </div>
     </div>
 
+    <!-- Backup Manager Modal -->
+    <div class="modal fade" id="backupManagerModal" tabindex="-1" aria-labelledby="backupManagerModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark text-light">
+          <div class="modal-header">
+            <h5 class="modal-title" id="backupManagerModalLabel"><i class="bi bi-database me-2"></i> Backup Manager</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h6 class="mb-0">Available Backups</h6>
+              <div>
+                <span class="badge bg-secondary" id="backupCount">0 backups</span>
+                <span class="badge bg-info ms-2" id="backupSize">0 MB</span>
+              </div>
+            </div>
+            
+            <div id="backupListStatus" class="alert alert-info">
+              <i class="bi bi-hourglass-split"></i> Loading backups...
+            </div>
+            
+            <div class="table-responsive" id="backupTableContainer" style="display:none;">
+              <table class="table table-dark table-hover">
+                <thead>
+                  <tr>
+                    <th>Filename</th>
+                    <th>Created</th>
+                    <th>Size</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="backupTableBody">
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary" onclick="refreshBackupList()">
+              <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="modal fade" id="systemResetModal" tabindex="-1" aria-labelledby="systemResetModalLabel" aria-hidden="true">
       <div class="modal-dialog">
         <div class="modal-content bg-dark text-light border border-danger">
@@ -1277,6 +1329,157 @@
                 }
               } catch(e){
                 showToast('Error sending reminders', 'danger');
+              }
+            }
+            // Backup Management Functions
+            async function createBackup(){
+              const btn = document.getElementById('btnCreateBackup');
+              if(btn) btn.disabled = true;
+              showToast('Creating backup...', 'info');
+              try{
+                const res = await fetch('/admin/backup/create', { method: 'POST' });
+                const data = await res.json();
+                if(data.ok){
+                  showToast('Backup created successfully!', 'success');
+                } else {
+                  showToast('Backup failed: ' + (data.error || 'unknown'), 'danger');
+                }
+              } catch(e){
+                showToast('Error creating backup', 'danger');
+              } finally {
+                if(btn) btn.disabled = false;
+              }
+            }
+
+            async function downloadBackup(){
+              showToast('Preparing backup download...', 'info');
+              try{
+                window.location.href = '/admin/backup/download';
+                setTimeout(() => showToast('Backup downloaded!', 'success'), 500);
+              } catch(e){
+                showToast('Error downloading backup', 'danger');
+              }
+            }
+
+            async function refreshBackupList(){
+              const statusEl = document.getElementById('backupListStatus');
+              const tableContainer = document.getElementById('backupTableContainer');
+              const tbody = document.getElementById('backupTableBody');
+              const countEl = document.getElementById('backupCount');
+              const sizeEl = document.getElementById('backupSize');
+              
+              statusEl.style.display = 'block';
+              statusEl.className = 'alert alert-info';
+              statusEl.innerHTML = '<i class="bi bi-hourglass-split"></i> Loading backups...';
+              tableContainer.style.display = 'none';
+              
+              try{
+                const res = await fetch('/admin/backup/list');
+                const data = await res.json();
+                
+                if(data.ok && data.backups.length > 0){
+                  tbody.innerHTML = '';
+                  data.backups.forEach(backup => {
+                    const row = tbody.insertRow();
+                    const sizeKB = (backup.size / 1024).toFixed(2);
+                    const sizeMB = (backup.size / 1024 / 1024).toFixed(2);
+                    const sizeDisplay = backup.size > 1024*1024 ? sizeMB + ' MB' : sizeKB + ' KB';
+                    const created = new Date(backup.created).toLocaleString();
+                    
+                    row.innerHTML = `
+                      <td><code>${backup.filename}</code></td>
+                      <td>${created}</td>
+                      <td>${sizeDisplay}</td>
+                      <td>
+                        <button class="btn btn-sm btn-success" onclick="downloadSpecificBackup('${backup.filename}')" title="Download">
+                          <i class="bi bi-download"></i>
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="restoreBackup('${backup.filename}')" title="Restore">
+                          <i class="bi bi-arrow-counterclockwise"></i>
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteBackup('${backup.filename}')" title="Delete">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </td>
+                    `;
+                  });
+                  
+                  const totalMB = (data.total_size / 1024 / 1024).toFixed(2);
+                  countEl.textContent = data.total + ' backup' + (data.total !== 1 ? 's' : '');
+                  sizeEl.textContent = totalMB + ' MB';
+                  
+                  statusEl.style.display = 'none';
+                  tableContainer.style.display = 'block';
+                } else {
+                  statusEl.className = 'alert alert-warning';
+                  statusEl.innerHTML = '<i class="bi bi-info-circle"></i> No backups found. Create your first backup!';
+                  tableContainer.style.display = 'none';
+                }
+              } catch(e){
+                statusEl.className = 'alert alert-danger';
+                statusEl.innerHTML = '<i class="bi bi-x-circle"></i> Error loading backups: ' + e.message;
+              }
+            }
+
+            async function downloadSpecificBackup(filename){
+              window.location.href = '/admin/backup/download/' + filename;
+            }
+
+            async function restoreBackup(filename){
+              if(!confirm(`Restore backup: ${filename}?\n\nThis will replace your current data. The app will need to restart.`)) return;
+              showToast('Restoring backup...', 'info');
+              try{
+                const res = await fetch('/admin/backup/restore/' + filename, { method: 'POST' });
+                const data = await res.json();
+                if(data.ok){
+                  showToast('Backup restored! Please restart the application.', 'success');
+                  refreshBackupList();
+                } else {
+                  showToast('Restore failed: ' + (data.error || 'unknown'), 'danger');
+                }
+              } catch(e){
+                showToast('Error restoring backup', 'danger');
+              }
+            }
+
+            async function deleteBackup(filename){
+              if(!confirm(`Delete backup: ${filename}?\n\nThis cannot be undone.`)) return;
+              try{
+                const res = await fetch('/admin/backup/delete/' + filename, { method: 'DELETE' });
+                const data = await res.json();
+                if(data.ok){
+                  showToast('Backup deleted', 'success');
+                  refreshBackupList();
+                } else {
+                  showToast('Delete failed: ' + (data.error || 'unknown'), 'danger');
+                }
+              } catch(e){
+                showToast('Error deleting backup', 'danger');
+              }
+            }
+
+            // Auto-load backups when modal is opened
+            document.addEventListener('DOMContentLoaded', function(){
+              const backupModal = document.getElementById('backupManagerModal');
+              if(backupModal){
+                backupModal.addEventListener('show.bs.modal', function(){
+                  refreshBackupList();
+                });
+              }
+            });
+
+            function confirmSystemReset(){
+              const modalEl = document.getElementById('systemResetModal');
+              if (modalEl && window.bootstrap){
+                const modalInstance = new bootstrap.Modal(modalEl);
+                modalInstance.show();
+                const confirmInput = document.getElementById('resetConfirmInput');
+                if(confirmInput){
+                  confirmInput.value = '';
+                  setTimeout(()=>confirmInput.focus(), 200);
+                }
+                const statusEl = document.getElementById('resetStatus');
+                if(statusEl) statusEl.textContent = '';
               }
             }
             // System Reset: open modal and perform POST /admin/system/reset with confirmation

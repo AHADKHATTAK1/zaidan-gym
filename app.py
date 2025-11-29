@@ -58,8 +58,17 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 db_path = os.path.join(BASE_DIR, "gym.db")
 # Support DATABASE_URL for production (e.g., Postgres). Fallback to local SQLite.
 db_url = os.getenv('DATABASE_URL')
-if db_url and db_url.startswith('postgres://'):
-    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+# Normalize postgres scheme and ensure SSL for Render external URLs
+if db_url:
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+    # Auto-append sslmode=require for Render external hostnames when missing
+    try:
+        if ('render.com' in db_url) and ('sslmode=' not in db_url):
+            sep = '&' if '?' in db_url else '?'
+            db_url = f"{db_url}{sep}sslmode=require"
+    except Exception:
+        pass
 app.config['SQLALCHEMY_DATABASE_URI'] = db_url or f"sqlite:///{db_path}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
@@ -2607,6 +2616,49 @@ def trigger_backup_on_login() -> None:
     append_audit('backup.auto_login', {'results': results})
 
 
+def perform_automatic_backup() -> dict:
+    """Perform automatic backup and return results."""
+    ok, data, ts = _build_backup_zip_bytes()
+    if not ok:
+        return {'ok': False, 'error': data}
+    
+    # Always save locally
+    l_ok, l_path = _save_backup_local(data, ts)
+    
+    # Clean old backups (keep last 30)
+    cleanup_old_backups(keep_count=30)
+    
+    return {
+        'ok': l_ok,
+        'timestamp': ts,
+        'path': l_path,
+        'size': len(data)
+    }
+
+
+def cleanup_old_backups(keep_count: int = 30) -> None:
+    """Remove old backups, keeping only the most recent ones."""
+    try:
+        backups = []
+        for fname in os.listdir(BACKUP_DIR):
+            if fname.startswith('backup_') and fname.endswith('.zip'):
+                fpath = os.path.join(BACKUP_DIR, fname)
+                backups.append((os.path.getmtime(fpath), fpath))
+        
+        # Sort by modification time (oldest first)
+        backups.sort()
+        
+        # Remove old backups
+        if len(backups) > keep_count:
+            for _, fpath in backups[:-keep_count]:
+                try:
+                    os.remove(fpath)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+
 def _upload_backup_to_gdrive(content: bytes, filename: str, mime: str = 'application/zip') -> tuple[bool, dict | str]:
     if not HAVE_GDRIVE:
         return False, 'Google Drive libraries not installed'
@@ -2651,6 +2703,120 @@ def download_backup():
         as_attachment=True,
         download_name=f"backup_{ts}.zip",
     )
+
+
+@app.route('/admin/backup/create', methods=['POST'])
+@admin_required
+def create_backup():
+    """Manually trigger a backup."""
+    result = perform_automatic_backup()
+    if result['ok']:
+        append_audit('backup.manual', {'timestamp': result['timestamp']})
+        return jsonify(result)
+    return jsonify(result), 500
+
+
+@app.route('/admin/backup/list', methods=['GET'])
+@admin_required
+def list_backups():
+    """List all available backups."""
+    try:
+        backups = []
+        for fname in os.listdir(BACKUP_DIR):
+            if fname.startswith('backup_') and fname.endswith('.zip'):
+                fpath = os.path.join(BACKUP_DIR, fname)
+                stat = os.stat(fpath)
+                backups.append({
+                    'filename': fname,
+                    'size': stat.st_size,
+                    'created': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    'timestamp': stat.st_mtime
+                })
+        
+        # Sort by timestamp (newest first)
+        backups.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        return jsonify({
+            'ok': True,
+            'backups': backups,
+            'total': len(backups),
+            'total_size': sum(b['size'] for b in backups)
+        })
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/admin/backup/restore/<filename>', methods=['POST'])
+@admin_required
+def restore_backup(filename):
+    """Restore from a specific backup file."""
+    try:
+        fpath = os.path.join(BACKUP_DIR, filename)
+        if not os.path.exists(fpath) or not filename.startswith('backup_'):
+            return jsonify({'ok': False, 'error': 'Invalid backup file'}), 404
+        
+        # Extract and restore database
+        with zipfile.ZipFile(fpath, 'r') as z:
+            if 'gym.db' in z.namelist():
+                # Backup current DB first
+                current_backup = db_path + '.before_restore'
+                if os.path.exists(db_path):
+                    import shutil
+                    shutil.copy2(db_path, current_backup)
+                
+                # Extract and replace
+                z.extract('gym.db', BASE_DIR)
+                
+                append_audit('backup.restored', {
+                    'filename': filename,
+                    'restored_at': datetime.now().isoformat()
+                })
+                
+                return jsonify({
+                    'ok': True,
+                    'message': 'Backup restored successfully',
+                    'note': 'Please restart the application to apply changes'
+                })
+            else:
+                return jsonify({'ok': False, 'error': 'Invalid backup format'}), 400
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/admin/backup/delete/<filename>', methods=['DELETE'])
+@admin_required
+def delete_backup(filename):
+    """Delete a specific backup file."""
+    try:
+        fpath = os.path.join(BACKUP_DIR, filename)
+        if not os.path.exists(fpath) or not filename.startswith('backup_'):
+            return jsonify({'ok': False, 'error': 'Invalid backup file'}), 404
+        
+        os.remove(fpath)
+        append_audit('backup.deleted', {'filename': filename})
+        
+        return jsonify({'ok': True, 'message': f'Backup {filename} deleted'})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
+
+
+@app.route('/admin/backup/download/<filename>', methods=['GET'])
+@admin_required
+def download_specific_backup(filename):
+    """Download a specific backup file."""
+    try:
+        fpath = os.path.join(BACKUP_DIR, filename)
+        if not os.path.exists(fpath) or not filename.startswith('backup_'):
+            return jsonify({'ok': False, 'error': 'Invalid backup file'}), 404
+        
+        return send_file(
+            fpath,
+            mimetype='application/zip',
+            as_attachment=True,
+            download_name=filename
+        )
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)}), 500
 
 @app.route('/api/members/<int:member_id>/remind', methods=['POST'])
 @login_required
@@ -3127,3 +3293,84 @@ def system_reset():
             'ok': False,
             'error': f'Reset failed: {str(e)}'
         }), 500
+
+@app.route('/dashboard/excel')
+@login_required
+def excel_dashboard():
+    """Excel-based auto-updating dashboard"""
+    return render_template('excel_dashboard.html', gym_name=get_gym_name())
+
+@app.route('/api/excel/data')
+@login_required
+def excel_data_endpoint():
+    """API endpoint for Excel data with auto-update support"""
+    EXCEL_FILE_PATH = os.path.join(BASE_DIR, 'data_file.xlsx')
+    
+    if not os.path.exists(EXCEL_FILE_PATH):
+        # Return sample data if file doesn't exist
+        return jsonify([{'Category': 'No Data', 'Value': 0}])
+    
+    try:
+        df = pd.read_excel(EXCEL_FILE_PATH)
+        # Convert to JSON format
+        data = df.to_dict(orient='records')
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Initialize automatic backup scheduler
+def init_backup_scheduler():
+    """Initialize automatic backup scheduler if enabled."""
+    if not HAVE_APSCHEDULER:
+        return
+    
+    # Check if automatic backups are enabled
+    auto_backup_enabled = os.getenv('AUTO_BACKUP_ENABLED', '1') in ('1', 'true', 'True')
+    if not auto_backup_enabled:
+        return
+    
+    # Get backup interval (default: every 6 hours)
+    backup_interval = int(os.getenv('BACKUP_INTERVAL_HOURS', '6'))
+    
+    def backup_job():
+        """Wrapper function to run backup within app context"""
+        with app.app_context():
+            perform_automatic_backup()
+    
+    try:
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(
+            func=backup_job,
+            trigger='interval',
+            hours=backup_interval,
+            id='automatic_backup',
+            name='Automatic Gym Backup',
+            replace_existing=True
+        )
+        scheduler.start()
+        
+        # Perform initial backup on startup (within app context)
+        with app.app_context():
+            result = perform_automatic_backup()
+            if result.get('ok'):
+                print(f"✓ Initial backup created: {result.get('path')}")
+        
+        print(f"✓ Automatic backup scheduler started (every {backup_interval} hours)")
+        print(f"✓ Backups saved to: {BACKUP_DIR}")
+    except Exception as e:
+        print(f"Warning: Could not start backup scheduler: {e}")
+
+
+if __name__ == '__main__':
+    # Initialize backup scheduler
+    init_backup_scheduler()
+    
+    print("="*60)
+    print("GYM MANAGEMENT SYSTEM - STARTING")
+    print("="*60)
+    print(f"Database: {db_path}")
+    print(f"Backups: {BACKUP_DIR}")
+    print(f"Server: http://0.0.0.0:5000")
+    print("="*60)
+    
+    app.run(host='0.0.0.0', port=5000, debug=True)
