@@ -1478,9 +1478,24 @@
         statsEl.textContent = '';
         try{
           const res = await fetch(`/api/members/${memberId}/payments`);
-          const rows = await res.json();
+          let data = await res.json();
+          let rows = [];
+          let admissionDate = null;
+          if(Array.isArray(data)){
+            rows = data;
+          } else if(data && data.payments){
+            rows = data.payments;
+            admissionDate = data.admission_date ? new Date(data.admission_date) : null;
+          }
           if(!Array.isArray(rows)){
             body.innerHTML = '<div class="text-danger">Failed to load payments.</div>';
+            return;
+          }
+          // Filter to show only from admission date onwards (exclude N/A status)
+          rows = rows.filter(p => p.status !== 'N/A');
+          if(rows.length === 0){
+            body.innerHTML = '<div class="text-muted">No payment records available from admission date.</div>';
+            statsEl.textContent = '';
             return;
           }
           let lastPaid=null, monthsUnpaid=0;

@@ -532,9 +532,31 @@
         body.innerHTML = '<div class="text-muted">Loading…</div>';
         try{
           const res = await fetch(`/api/members/${memberId}/payments`);
-          const rows = await res.json();
+          const data = await res.json();
+          let rows = [];
+          let admissionDate = null;
+          if(Array.isArray(data)){
+            // Legacy format support
+            rows = data;
+          } else if(data && data.payments){
+            rows = data.payments;
+            admissionDate = data.admission_date ? new Date(data.admission_date) : null;
+          }
           if(!Array.isArray(rows)){
             body.innerHTML = '<div class="text-danger">Failed to load payments.</div>';
+            return;
+          }
+          // Filter to show only from admission date onwards (exclude N/A status)
+          rows = rows.filter(p => p.status !== 'N/A');
+          if(admissionDate){
+            rows = rows.filter(p => {
+              const payDate = new Date(p.year, p.month - 1, 1);
+              const admMonth = new Date(admissionDate.getFullYear(), admissionDate.getMonth(), 1);
+              return payDate >= admMonth;
+            });
+          }
+          if(rows.length === 0){
+            body.innerHTML = '<div class="text-muted">No payment records available from admission date.</div>';
             return;
           }
           const nowY = parseInt(document.getElementById('year').value || String(new Date().getFullYear()));
