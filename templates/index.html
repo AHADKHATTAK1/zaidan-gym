@@ -230,8 +230,36 @@
       <button class="btn btn-outline-primary w-100" type="button" onclick="debouncedFetchMembers()"><i class="bi bi-search"></i> Apply</button>
       </div>
       <div class="col-md-2 d-flex gap-2">
-      <button class="btn btn-outline-success w-100" type="button" onclick="connectAll()"><i class="bi bi-link-45deg"></i> Connect All</button>
+        <button class="btn btn-outline-success w-100" type="button" onclick="connectAll()"><i class="bi bi-link-45deg"></i> Connect All</button>
       </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button class="btn btn-outline-info w-100" type="button" onclick="exportMembers()"><i class="bi bi-download"></i> Export</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+      <!-- Bulk Operations Toolbar -->
+      <div id="bulkToolbar" class="card mb-2 d-none">
+        <div class="card-body py-2 d-flex justify-content-between align-items-center">
+          <div>
+            <span class="fw-bold"><span id="selectedCount">0</span> selected</span>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-danger" onclick="bulkDelete()"><i class="bi bi-trash"></i> Delete Selected</button>
+            <button class="btn btn-sm btn-outline-primary" onclick="bulkExport()"><i class="bi bi-file-earmark-arrow-down"></i> Export Selected</button>
+            <button class="btn btn-sm btn-outline-warning" onclick="bulkSendReminders()"><i class="bi bi-bell"></i> Send Reminders</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()"><i class="bi bi-x"></i> Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <h5 class="mb-0">Members List (<span id="totalCount">0</span>)</h5>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="selectAll" onchange="toggleSelectAll()">
+          <label class="form-check-label" for="selectAll">Select All</label>
+        </div>
       </div>
       <div id="members">
       <div class="text-center py-4">
@@ -242,6 +270,42 @@
       </div>
       </div>
       <hr />
+
+      <!-- Quick Stats Card -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <div class="text-center">
+                <i class="bi bi-people-fill text-primary fs-2"></i>
+                <h5 class="mb-0 mt-2" id="statsActive">0</h5>
+                <small class="text-muted">Active Members</small>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center">
+                <i class="bi bi-cash-coin text-success fs-2"></i>
+                <h5 class="mb-0 mt-2" id="statsPaid">0</h5>
+                <small class="text-muted">Paid This Month</small>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center">
+                <i class="bi bi-exclamation-triangle text-warning fs-2"></i>
+                <h5 class="mb-0 mt-2" id="statsUnpaid">0</h5>
+                <small class="text-muted">Unpaid This Month</small>
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="text-center">
+                <i class="bi bi-calendar-check text-info fs-2"></i>
+                <h5 class="mb-0 mt-2" id="statsAttendance">0</h5>
+                <small class="text-muted">Today's Attendance</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <!-- Data Uploads -->
       <div class="mb-4">
@@ -335,43 +399,46 @@
         <label class="form-label">Photo</label>
         <input type="file" class="form-control" id="edit_photo" accept="image/*" title="Upload photo" placeholder="Upload photo" />
         <div class="mt-2">
-        <video
-                        id="camStream"
-                        autoplay
-                        class="w-100 rounded border d-none edit-camera-preview"
-                      ></video>
-                        Start Camera
-                    <div class="mt-2">
-                      <video
-                        id="camStream"
-                        autoplay
-                        class="w-100 rounded border d-none edit-camera-preview"
-                      ></video>
-                        Start Camera
-                      ></video>
-                      <canvas
-                        id="editCamCanvas"
-                        class="w-100 rounded border d-none edit-camera-preview"
-                      ></canvas>
-                      <button
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary"
-                        id="btnStartCam"
-                        onclick="startCamera()"
-                      >
-                        Start Camera
-                      </button>
-                        type="button"
-                        class="btn btn-sm btn-outline-secondary d-none"
-                        id="btnStopCam"
-                        onclick="stopCamera()"
-                      >
-                        Stop
-                      </button>
-                    </div>
-                    <div id="captureStatus" class="small text-muted"></div>
-                  </div>
-                </div>
+          <video
+            id="editCamStream"
+            autoplay
+            class="w-100 rounded border d-none"
+            style="max-height: 300px;"
+          ></video>
+          <canvas
+            id="editCamCanvas"
+            class="w-100 rounded border d-none"
+            style="max-height: 300px;"
+          ></canvas>
+          <div class="d-flex gap-2 mt-2">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              id="btnStartCam"
+              onclick="startEditCamera()"
+            >
+              <i class="bi bi-camera-video"></i> Start Camera
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-primary d-none"
+              id="btnCaptureCam"
+              onclick="captureEditPhoto()"
+            >
+              <i class="bi bi-camera"></i> Capture
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger d-none"
+              id="btnStopCam"
+              onclick="stopEditCamera()"
+            >
+              <i class="bi bi-x-circle"></i> Stop
+            </button>
+          </div>
+          <div id="captureStatus" class="small text-muted mt-2"></div>
+        </div>
+        </div>
               </form>
             </div>
             <div class="modal-footer">
@@ -465,8 +532,14 @@
       }
     });
 
+    window.selectedMembers = new Set();
+    window.allMembers = [];
+
     function renderMembers(list) {
+      window.allMembers = list;
       const container = document.getElementById('members');
+      const totalCount = document.getElementById('totalCount');
+      if (totalCount) totalCount.textContent = list.length;
       if (!Array.isArray(list) || list.length === 0) {
         container.innerHTML = '<div class="text-muted">No members found.</div>';
         return;
@@ -477,11 +550,13 @@
         const ttype = m.training_type ? m.training_type : '';
         const fee = (m.monthly_fee !== null && m.monthly_fee !== undefined) ? m.monthly_fee : '';
         const photoUrl = m.photo_url ? m.photo_url : '/static/uploads/default-avatar.png';
+        const isSelected = window.selectedMembers.has(m.id);
         return `
-          <div class="card mb-2">
+          <div class="card mb-2 ${isSelected ? 'border-primary' : ''}">
             <div class="card-body">
               <div class="d-flex justify-content-between align-items-start mb-2">
                 <div class="d-flex gap-3 align-items-center">
+                  <input type="checkbox" class="form-check-input member-checkbox" data-member-id="${m.id}" ${isSelected ? 'checked' : ''} onchange="toggleMemberSelection(${m.id})">
                   <img src="${photoUrl}" alt="${m.name}" class="rounded-circle" width="50" height="50" style="object-fit:cover;" onerror="this.src='/static/uploads/default-avatar.png'" />
                   <div>
                     <div class="fw-semibold">${m.name || 'Unnamed'}</div>
@@ -554,6 +629,27 @@
 
     async function openEditMember(memberId) {
       try {
+        // Reset camera/file UI from previous edit session
+        try {
+          stopEditCamera();
+        } catch(_) {}
+        const photoInputEl = document.getElementById('edit_photo');
+        if (photoInputEl) {
+          photoInputEl.value = '';
+        }
+        const v = document.getElementById('editCamStream');
+        const c = document.getElementById('editCamCanvas');
+        const btnStart = document.getElementById('btnStartCam');
+        const btnCapture = document.getElementById('btnCaptureCam');
+        const btnStop = document.getElementById('btnStopCam');
+        const statusEl = document.getElementById('captureStatus');
+        if (v) v.classList.add('d-none');
+        if (c) c.classList.add('d-none');
+        if (btnStart) btnStart.classList.remove('d-none');
+        if (btnCapture) btnCapture.classList.add('d-none');
+        if (btnStop) btnStop.classList.add('d-none');
+        if (statusEl) statusEl.textContent = '';
+
         const res = await fetch(`/api/members?search=${memberId}`);
         const list = await res.json();
         const m = Array.isArray(list) ? list.find(x => x.id === memberId) : null;
@@ -598,7 +694,27 @@
         });
         const js = await res.json();
         if (res.ok && js.ok) {
-          if (typeof showToast === 'function') showToast('Member updated');
+          // If there is a photo selected (either from file input or camera capture), upload it
+          const photoInput = document.getElementById('edit_photo');
+          if (photoInput && photoInput.files && photoInput.files[0]) {
+            try {
+              const fd = new FormData();
+              fd.append('photo', photoInput.files[0]);
+              const up = await fetch(`/api/members/${memberId}/photo`, { method: 'POST', body: fd });
+              const upJs = await up.json().catch(() => ({}));
+              if (up.ok && upJs.ok) {
+                if (typeof showToast === 'function') showToast('Member updated and photo uploaded');
+              } else {
+                if (typeof showToast === 'function') showToast('Member updated, but photo upload failed', 'warning');
+              }
+            } catch (e) {
+              console.error(e);
+              if (typeof showToast === 'function') showToast('Member updated, but photo upload errored', 'warning');
+            }
+          } else {
+            if (typeof showToast === 'function') showToast('Member updated');
+          }
+          // Close modal and refresh list
           bootstrap.Modal.getInstance(document.getElementById('editMemberModal'))?.hide();
           fallbackFetchMembers();
         } else {
@@ -803,6 +919,229 @@
         wrap.classList.remove('d-none');
       } else {
         wrap.classList.add('d-none');
+      }
+    }
+
+    // Camera functions for Edit Modal
+    let editCameraStream = null;
+
+    async function startEditCamera() {
+      const video = document.getElementById('editCamStream');
+      const canvas = document.getElementById('editCamCanvas');
+      const btnStart = document.getElementById('btnStartCam');
+      const btnCapture = document.getElementById('btnCaptureCam');
+      const btnStop = document.getElementById('btnStopCam');
+      const status = document.getElementById('captureStatus');
+
+      try {
+        editCameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
+        video.srcObject = editCameraStream;
+        video.classList.remove('d-none');
+        canvas.classList.add('d-none');
+        btnStart.classList.add('d-none');
+        btnCapture.classList.remove('d-none');
+        btnStop.classList.remove('d-none');
+        status.textContent = 'Camera ready. Click Capture to take photo.';
+        status.className = 'small text-success mt-2';
+      } catch (e) {
+        console.error('Camera error:', e);
+        status.textContent = 'Camera access denied or unavailable.';
+        status.className = 'small text-danger mt-2';
+      }
+    }
+
+    function captureEditPhoto() {
+      const video = document.getElementById('editCamStream');
+      const canvas = document.getElementById('editCamCanvas');
+      const status = document.getElementById('captureStatus');
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0);
+      
+      video.classList.add('d-none');
+      canvas.classList.remove('d-none');
+      
+      status.textContent = 'Photo captured! Save changes to upload.';
+      status.className = 'small text-success mt-2';
+
+      // Convert canvas to blob and set to file input
+      canvas.toBlob(blob => {
+        const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        document.getElementById('edit_photo').files = dataTransfer.files;
+      }, 'image/jpeg', 0.9);
+    }
+
+    function stopEditCamera() {
+      const video = document.getElementById('editCamStream');
+      const canvas = document.getElementById('editCamCanvas');
+      const btnStart = document.getElementById('btnStartCam');
+      const btnCapture = document.getElementById('btnCaptureCam');
+      const btnStop = document.getElementById('btnStopCam');
+      const status = document.getElementById('captureStatus');
+
+      if (editCameraStream) {
+        editCameraStream.getTracks().forEach(track => track.stop());
+        editCameraStream = null;
+      }
+      
+      video.classList.add('d-none');
+      canvas.classList.add('d-none');
+      btnStart.classList.remove('d-none');
+      btnCapture.classList.add('d-none');
+      btnStop.classList.add('d-none');
+      status.textContent = '';
+    }
+
+    // Advanced Search with Autocomplete
+    let searchTimeout;
+    function handleAdvancedSearch() {
+      clearTimeout(searchTimeout);
+      const query = document.getElementById('searchQuery').value.trim();
+      if (query.length < 2) {
+        document.getElementById('searchAutocomplete').classList.add('d-none');
+        debouncedFetchMembers();
+        return;
+      }
+      searchTimeout = setTimeout(() => {
+        showAutocomplete(query);
+        debouncedFetchMembers();
+      }, 300);
+    }
+
+    function showAutocomplete(query) {
+      const matches = window.allMembers.filter(m => 
+        (m.name && m.name.toLowerCase().includes(query.toLowerCase())) ||
+        (m.phone && m.phone.includes(query)) ||
+        (m.id && m.id.toString().includes(query))
+      ).slice(0, 5);
+      
+      const container = document.getElementById('searchAutocomplete');
+      if (matches.length === 0) {
+        container.classList.add('d-none');
+        return;
+      }
+      
+      container.innerHTML = matches.map(m => `
+        <div class="p-2 border-bottom cursor-pointer hover-bg-light" onclick="selectFromAutocomplete(${m.id}, '${m.name}')"
+             style="cursor:pointer;" onmouseover="this.style.backgroundColor='#f0f0f0'" onmouseout="this.style.backgroundColor=''">
+          <div class="fw-bold">${m.name}</div>
+          <div class="small text-muted">${m.phone || ''} • ID: ${m.id}</div>
+        </div>
+      `).join('');
+      container.classList.remove('d-none');
+    }
+
+    function selectFromAutocomplete(id, name) {
+      document.getElementById('searchQuery').value = name;
+      document.getElementById('searchAutocomplete').classList.add('d-none');
+      openMemberDetails(id);
+    }
+
+    // Bulk Operations
+    function toggleSelectAll() {
+      const checked = document.getElementById('selectAll').checked;
+      window.selectedMembers.clear();
+      if (checked) {
+        window.allMembers.forEach(m => window.selectedMembers.add(m.id));
+      }
+      updateBulkToolbar();
+      renderMembers(window.allMembers);
+    }
+
+    function toggleMemberSelection(id) {
+      if (window.selectedMembers.has(id)) {
+        window.selectedMembers.delete(id);
+      } else {
+        window.selectedMembers.add(id);
+      }
+      updateBulkToolbar();
+    }
+
+    function updateBulkToolbar() {
+      const count = window.selectedMembers.size;
+      document.getElementById('selectedCount').textContent = count;
+      const toolbar = document.getElementById('bulkToolbar');
+      if (count > 0) {
+        toolbar.classList.remove('d-none');
+      } else {
+        toolbar.classList.add('d-none');
+      }
+      document.getElementById('selectAll').checked = count === window.allMembers.length && count > 0;
+    }
+
+    function clearSelection() {
+      window.selectedMembers.clear();
+      updateBulkToolbar();
+      renderMembers(window.allMembers);
+    }
+
+    async function bulkDelete() {
+      if (window.selectedMembers.size === 0) return;
+      if (!confirm(`Delete ${window.selectedMembers.size} members? This cannot be undone.`)) return;
+      
+      let deleted = 0, failed = 0;
+      for (const id of window.selectedMembers) {
+        try {
+          const res = await fetch(`/api/members/${id}`, { method: 'DELETE' });
+          if (res.ok) deleted++; else failed++;
+        } catch (e) {
+          failed++;
+        }
+      }
+      if (typeof showToast === 'function') showToast(`Deleted ${deleted} members. Failed: ${failed}`);
+      clearSelection();
+      fallbackFetchMembers();
+    }
+
+    async function bulkExport() {
+      const selected = window.allMembers.filter(m => window.selectedMembers.has(m.id));
+      exportToCSV(selected, `members_export_${Date.now()}.csv`);
+    }
+
+    async function exportMembers() {
+      exportToCSV(window.allMembers, `all_members_${Date.now()}.csv`);
+    }
+
+    function exportToCSV(data, filename) {
+      if (!data.length) {
+        if (typeof showToast === 'function') showToast('No data to export', 'warning');
+        return;
+      }
+      const headers = ['ID', 'Name', 'Phone', 'Admission Date', 'Training Type', 'Monthly Fee', 'Active'];
+      const rows = data.map(m => [
+        m.id, m.name, m.phone || '', m.admission_date || '', m.training_type || '', m.monthly_fee || '', m.is_active ? 'Yes' : 'No'
+      ]);
+      const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      if (typeof showToast === 'function') showToast('Export complete', 'success');
+    }
+
+    async function bulkSendReminders() {
+      if (window.selectedMembers.size === 0) return;
+      if (!confirm(`Send payment reminders to ${window.selectedMembers.size} members?`)) return;
+      if (typeof showToast === 'function') showToast('Sending reminders...', 'info');
+      try {
+        const res = await fetch('/api/reminders/bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ member_ids: Array.from(window.selectedMembers) })
+        });
+        const data = await res.json();
+        if (data.ok) {
+          if (typeof showToast === 'function') showToast(`Sent ${data.sent || 0} reminders. Failed: ${data.failed || 0}`, 'success');
+        }
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Error sending reminders', 'danger');
       }
     }
 
