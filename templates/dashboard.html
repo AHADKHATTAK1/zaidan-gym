@@ -225,6 +225,38 @@
         </div>
       </div>
 
+      <!-- Day View - Unpaid Members -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">
+              <i class="bi bi-calendar-check me-1"></i>View Unpaid by Date
+            </h5>
+            <div class="d-flex gap-2 align-items-center">
+              <label class="form-label mb-0 small" for="dayViewDate">Select Date</label>
+              <input
+                id="dayViewDate"
+                class="form-control form-control-sm"
+                type="date"
+                aria-label="Select date to view unpaid"
+                title="Select date to view unpaid members"
+              />
+              <button
+                class="btn btn-sm btn-outline-primary"
+                onclick="loadUnpaidForDate()"
+                aria-label="Show unpaid members"
+                title="Show unpaid members for selected date"
+              >
+                <i class="bi bi-search"></i> Show Unpaid
+              </button>
+            </div>
+          </div>
+          <div id="dayViewResults" class="mt-3">
+            <div class="text-muted small">Select a date and click Show Unpaid to view members with unpaid fees.</div>
+          </div>
+        </div>
+      </div>
+
       <div class="card mb-4">
         <div class="card-body">
           <h5 class="card-title mb-3">
@@ -1164,6 +1196,67 @@
               }
             });
 
+            // Day View - Load unpaid members for selected date
+            async function loadUnpaidForDate() {
+              const dateInput = document.getElementById('dayViewDate');
+              const resultsDiv = document.getElementById('dayViewResults');
+              const dateVal = dateInput.value;
+              if (!dateVal) {
+                resultsDiv.innerHTML = '<div class="alert alert-warning">Please select a date.</div>';
+                return;
+              }
+              const d = new Date(dateVal);
+              const year = d.getFullYear();
+              const month = d.getMonth() + 1;
+              try {
+                resultsDiv.innerHTML = '<div class="spinner-border spinner-border-sm"></div> Loading...';
+                const res = await fetch(`/api/fees/month?year=${year}&month=${month}`);
+                const js = await res.json();
+                if (!res.ok || !js.ok) {
+                  resultsDiv.innerHTML = '<div class="alert alert-danger">Failed to load data.</div>';
+                  return;
+                }
+                const unpaidList = (js.members || []).filter(m => m.status === 'Unpaid');
+                if (unpaidList.length === 0) {
+                  resultsDiv.innerHTML = '<div class="alert alert-success">No unpaid members for this month.</div>';
+                  return;
+                }
+                let html = `<div class="alert alert-info mb-2">Found ${unpaidList.length} unpaid member(s) for ${month}/${year}</div>`;
+                html += '<div class="table-responsive"><table class="table table-sm table-striped"><thead><tr>';
+                html += '<th>ID</th><th>Name</th><th>Phone</th><th>Amount</th><th>Actions</th></tr></thead><tbody>';
+                unpaidList.forEach(m => {
+                  html += `<tr>
+                    <td>${m.id}</td>
+                    <td>${m.name}</td>
+                    <td>${m.phone || ''}</td>
+                    <td>${m.amount || ''}</td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-success" onclick="showMemberDetail(${m.id})" title="View Details">
+                        <i class="bi bi-eye"></i> View
+                      </button>
+                      <button class="btn btn-sm btn-outline-primary" onclick="openPayModal(${m.id}, ${year}, ${month}, ${m.amount || 0})" title="Pay Now">
+                        <i class="bi bi-cash-coin"></i> Pay
+                      </button>
+                    </td>
+                  </tr>`;
+                });
+                html += '</tbody></table></div>';
+                resultsDiv.innerHTML = html;
+              } catch (e) {
+                console.error(e);
+                resultsDiv.innerHTML = '<div class="alert alert-danger">Error loading unpaid members.</div>';
+              }
+            }
+
+            // Set today's date as default for day view
+            (function() {
+              const dateInput = document.getElementById('dayViewDate');
+              if (dateInput) {
+                const today = new Date().toISOString().split('T')[0];
+                dateInput.value = today;
+              }
+            })();
+
             // Onboarding: lightweight 2-step wizard built dynamically
             function buildOnboardModal() {
               const html = `
@@ -1347,10 +1440,11 @@
               if(btn) btn.disabled = true;
               showToast('Creating backup...', 'info');
               try{
-                const res = await fetch('/admin/backup/create', { method: 'POST' });
+                const res = await fetch('/api/backup/create', { method: 'POST' });
                 const data = await res.json();
                 if(data.ok){
                   showToast('Backup created successfully!', 'success');
+                  if(typeof refreshBackupList === 'function') refreshBackupList();
                 } else {
                   showToast('Backup failed: ' + (data.error || 'unknown'), 'danger');
                 }
@@ -1364,7 +1458,7 @@
             async function downloadBackup(){
               showToast('Preparing backup download...', 'info');
               try{
-                window.location.href = '/admin/backup/download';
+                window.location.href = '/api/backup/download';
                 setTimeout(() => showToast('Backup downloaded!', 'success'), 500);
               } catch(e){
                 showToast('Error downloading backup', 'danger');
@@ -1384,7 +1478,7 @@
               tableContainer.style.display = 'none';
               
               try{
-                const res = await fetch('/admin/backup/list');
+                const res = await fetch('/api/backup/list');
                 const data = await res.json();
                 
                 if(data.ok && data.backups.length > 0){
@@ -1521,7 +1615,7 @@
                 statusEl.textContent = 'Resetting system...';
                 statusEl.className = 'text-warning';
                 try{
-                  const resp = await fetch('/admin/system/reset', {
+                  const resp = await fetch('/api/system/reset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ confirm: 'RESET' })

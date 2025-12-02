@@ -298,7 +298,7 @@
         </div>
         <div>
         <label class="form-label">Training Type</label>
-        <select class="form-select" id="edit_training_type" title="Select training type">
+        <select class="form-select" id="edit_training_type" title="Select training type" onchange="toggleEditCustomTraining()">
         <option value="standard">Gym</option>
         <option value="personal">Personal</option>
         <option value="cardio">Cardio</option>
@@ -476,16 +476,26 @@
         const adm = m.admission_date ? m.admission_date : '';
         const ttype = m.training_type ? m.training_type : '';
         const fee = (m.monthly_fee !== null && m.monthly_fee !== undefined) ? m.monthly_fee : '';
+        const photoUrl = m.photo_url ? m.photo_url : '/static/uploads/default-avatar.png';
         return `
           <div class="card mb-2">
-            <div class="card-body d-flex justify-content-between align-items-center">
-              <div>
-                <div class="fw-semibold">${m.name || 'Unnamed'}</div>
-                <div class="text-muted small">${phone}</div>
-                <div class="text-muted small">Admission: ${adm} • ${ttype}${fee !== '' ? ` • Fee: ${fee}` : ''}</div>
-              </div>
-              <div class="d-flex gap-2">
-                <a class="btn btn-sm btn-outline-primary" href="#" onclick="openMemberDetails(${m.id}); return false;">View</a>
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start mb-2">
+                <div class="d-flex gap-3 align-items-center">
+                  <img src="${photoUrl}" alt="${m.name}" class="rounded-circle" width="50" height="50" style="object-fit:cover;" onerror="this.src='/static/uploads/default-avatar.png'" />
+                  <div>
+                    <div class="fw-semibold">${m.name || 'Unnamed'}</div>
+                    <div class="text-muted small">${phone}</div>
+                    <div class="text-muted small">Admission: ${adm} • ${ttype}${fee !== '' ? ` • Fee: ${fee}` : ''}</div>
+                  </div>
+                </div>
+                <div class="d-flex gap-1 flex-wrap">
+                  <button class="btn btn-sm btn-outline-primary" onclick="openMemberDetails(${m.id})" title="View Details"><i class="bi bi-eye"></i> View</button>
+                  <button class="btn btn-sm btn-outline-secondary" onclick="openEditMember(${m.id})" title="Edit Member"><i class="bi bi-pencil"></i> Edit</button>
+                  <button class="btn btn-sm btn-outline-success" onclick="payThisMonth(${m.id})" title="Pay This Month"><i class="bi bi-cash-coin"></i> Pay</button>
+                  <button class="btn btn-sm btn-outline-info" onclick="uploadPhoto(${m.id})" title="Upload Photo"><i class="bi bi-camera"></i> Photo</button>
+                  <button class="btn btn-sm btn-outline-danger" onclick="deleteMember(${m.id})" title="Delete Member"><i class="bi bi-trash"></i> Delete</button>
+                </div>
               </div>
             </div>
           </div>
@@ -519,12 +529,155 @@
           <div class="mb-2"><strong>${m.name || ''}</strong> — ${m.phone || ''}</div>
           ${payHtml}
         `;
+        // Build transactions table
+        const txTab = document.getElementById('tab-transactions');
+        if (txTab) {
+          const txRes = await fetch(`/api/members/${memberId}/payments`);
+          const txList = await txRes.json();
+          let txHtml = '<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Date</th><th>Month</th><th>Amount</th><th>Method</th></tr></thead><tbody>';
+          if (Array.isArray(txList) && txList.length > 0) {
+            txHtml += txList.map(t => `<tr><td>${t.created_at || ''}</td><td>${t.month || ''}</td><td>${t.amount || ''}</td><td>${t.method || ''}</td></tr>`).join('');
+          } else {
+            txHtml += '<tr><td colspan="4" class="text-muted">No transactions</td></tr>';
+          }
+          txHtml += '</tbody></table></div>';
+          txTab.innerHTML = txHtml;
+        }
         const modalEl = document.getElementById('memberDetailsModal');
         const modal = new bootstrap.Modal(modalEl);
         modal.show();
       } catch (e) {
         console.error(e);
         if (typeof showToast === 'function') showToast('Failed to load member details');
+      }
+    }
+
+    async function openEditMember(memberId) {
+      try {
+        const res = await fetch(`/api/members?search=${memberId}`);
+        const list = await res.json();
+        const m = Array.isArray(list) ? list.find(x => x.id === memberId) : null;
+        if (!m) throw new Error('Member not found');
+        document.getElementById('edit_name').value = m.name || '';
+        document.getElementById('edit_phone').value = m.phone || '';
+        document.getElementById('edit_admission').value = m.admission_date || '';
+        document.getElementById('edit_monthly_fee').value = m.monthly_fee ?? '';
+        document.getElementById('edit_training_type').value = m.training_type || 'standard';
+        document.getElementById('edit_special_tag').checked = !!m.special_tag;
+        document.getElementById('edit_custom_training').value = m.custom_training || '';
+        if (m.training_type === 'other') {
+          document.getElementById('edit_custom_training_wrap').classList.remove('d-none');
+        }
+        window.currentEditMemberId = memberId;
+        const modalEl = document.getElementById('editMemberModal');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
+      } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Failed to load member for edit');
+      }
+    }
+
+    async function saveEdit() {
+      const memberId = window.currentEditMemberId;
+      if (!memberId) return;
+      const data = {
+        name: document.getElementById('edit_name').value.trim(),
+        phone: document.getElementById('edit_phone').value.trim(),
+        admission_date: document.getElementById('edit_admission').value,
+        monthly_fee: document.getElementById('edit_monthly_fee').value || null,
+        training_type: document.getElementById('edit_training_type').value,
+        special_tag: document.getElementById('edit_special_tag').checked,
+        custom_training: document.getElementById('edit_custom_training').value.trim() || null
+      };
+      try {
+        const res = await fetch(`/api/members/${memberId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data)
+        });
+        const js = await res.json();
+        if (res.ok && js.ok) {
+          if (typeof showToast === 'function') showToast('Member updated');
+          bootstrap.Modal.getInstance(document.getElementById('editMemberModal'))?.hide();
+          fallbackFetchMembers();
+        } else {
+          if (typeof showToast === 'function') showToast('Failed to update member', 'danger');
+        }
+      } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Error updating member', 'danger');
+      }
+    }
+
+    async function payThisMonth(memberId) {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      const payload = { member_id: memberId, year, month, method: 'cash' };
+      try {
+        const res = await fetch('/api/payment/pay-now', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const js = await res.json();
+        if (res.ok && js.ok) {
+          if (typeof showToast === 'function') showToast('Payment recorded. Opening receipt...');
+          window.open(js.receipt_url, '_blank');
+          fallbackFetchMembers();
+        } else {
+          if (typeof showToast === 'function') showToast('Payment failed: ' + (js.error || 'unknown'), 'danger');
+        }
+      } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Error processing payment', 'danger');
+      }
+    }
+
+    async function uploadPhoto(memberId) {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('photo', file);
+        try {
+          const res = await fetch(`/api/members/${memberId}/photo`, {
+            method: 'POST',
+            body: fd
+          });
+          const js = await res.json();
+          if (res.ok && js.ok) {
+            if (typeof showToast === 'function') showToast('Photo uploaded');
+            fallbackFetchMembers();
+          } else {
+            if (typeof showToast === 'function') showToast('Upload failed', 'danger');
+          }
+        } catch (err) {
+          console.error(err);
+          if (typeof showToast === 'function') showToast('Error uploading photo', 'danger');
+        }
+      };
+      input.click();
+    }
+
+    async function deleteMember(memberId) {
+      if (!confirm('Delete this member and all payment records?')) return;
+      try {
+        const res = await fetch(`/api/members/${memberId}`, { method: 'DELETE' });
+        const js = await res.json();
+        if (res.ok && js.ok) {
+          if (typeof showToast === 'function') showToast('Member deleted');
+          fallbackFetchMembers();
+        } else {
+          if (typeof showToast === 'function') showToast('Delete failed', 'danger');
+        }
+      } catch (e) {
+        console.error(e);
+        if (typeof showToast === 'function') showToast('Error deleting member', 'danger');
       }
     }
 
@@ -640,6 +793,16 @@
         }
       } catch (e) {
         console.error(e);
+      }
+    }
+
+    function toggleEditCustomTraining() {
+      const sel = document.getElementById('edit_training_type');
+      const wrap = document.getElementById('edit_custom_training_wrap');
+      if (sel.value === 'other') {
+        wrap.classList.remove('d-none');
+      } else {
+        wrap.classList.add('d-none');
       }
     }
 

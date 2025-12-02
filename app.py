@@ -992,6 +992,14 @@ def dashboard():
         is_admin=is_admin
     )
 
+@app.route('/dashboard/excel')
+@login_required
+def excel_dashboard():
+    """Excel data management dashboard."""
+    gym_name = get_gym_name()
+    logo_url = get_setting('logo_filename') or ''
+    return render_template('excel_dashboard.html', gym_name=gym_name, logo_url=logo_url, username=session.get('username'))
+
 @app.route('/api/stats/monthly')
 @login_required
 def stats_monthly():
@@ -1388,6 +1396,88 @@ def fees_remind():
             else:
                 failed += 1
         return {"ok": True, "sent": sent, "failed": failed}
+
+@app.route('/api/backup/create', methods=['POST'])
+@login_required
+def backup_create():
+    """Create a backup ZIP file with database and uploads."""
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        backup_filename = f"backup_{timestamp}.zip"
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        os.makedirs(backup_dir, exist_ok=True)
+        backup_path = os.path.join(backup_dir, backup_filename)
+        
+        with zipfile.ZipFile(backup_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            # Add database file
+            db_path = os.path.join(os.path.dirname(__file__), 'gym.db')
+            if os.path.exists(db_path):
+                zipf.write(db_path, 'gym.db')
+            # Add uploads directory
+            uploads_dir = os.path.join(os.path.dirname(__file__), 'static', 'uploads')
+            if os.path.exists(uploads_dir):
+                for root, dirs, files in os.walk(uploads_dir):
+                    for file in files:
+                        file_path = os.path.join(root, file)
+                        arcname = os.path.join('static', 'uploads', os.path.relpath(file_path, uploads_dir))
+                        zipf.write(file_path, arcname)
+        
+        return jsonify({"ok": True, "filename": backup_filename, "path": backup_path})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/backup/download', methods=['GET'])
+@login_required
+def backup_download():
+    """Download the most recent backup file."""
+    try:
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        if not os.path.exists(backup_dir):
+            return jsonify({"ok": False, "error": "No backups directory found"}), 404
+        backups = [f for f in os.listdir(backup_dir) if f.endswith('.zip')]
+        if not backups:
+            return jsonify({"ok": False, "error": "No backups found"}), 404
+        backups.sort(reverse=True)
+        latest = backups[0]
+        backup_path = os.path.join(backup_dir, latest)
+        return send_file(backup_path, as_attachment=True, download_name=latest)
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/backup/list', methods=['GET'])
+@login_required
+def backup_list():
+    """List all available backup files."""
+    try:
+        backup_dir = os.path.join(os.path.dirname(__file__), 'backups')
+        if not os.path.exists(backup_dir):
+            return jsonify({"ok": True, "backups": []})
+        backups = []
+        for f in os.listdir(backup_dir):
+            if f.endswith('.zip'):
+                file_path = os.path.join(backup_dir, f)
+                size = os.path.getsize(file_path)
+                created = datetime.fromtimestamp(os.path.getctime(file_path)).isoformat()
+                backups.append({"filename": f, "size": size, "created": created})
+        backups.sort(key=lambda x: x['created'], reverse=True)
+        return jsonify({"ok": True, "backups": backups})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route('/api/system/reset', methods=['POST'])
+@login_required
+def system_reset():
+    """Reset system to factory defaults (clear all data)."""
+    try:
+        confirm = request.json.get('confirm')
+        if confirm != 'RESET':
+            return jsonify({"ok": False, "error": "Confirmation required"}), 400
+        # Drop all tables and recreate
+        db.drop_all()
+        db.create_all()
+        return jsonify({"ok": True, "message": "System reset to factory defaults"})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route('/api/fees/summary', methods=['GET'])
 @login_required
