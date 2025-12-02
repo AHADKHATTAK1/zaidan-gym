@@ -1,0 +1,4 @@
+/* Custom styles for camera and images */
+.max-h-300 { max-height: 300px; }
+.object-fit-cover { object-fit: cover; }
+.camera-preview { max-height: 300px; object-fit: cover; }
