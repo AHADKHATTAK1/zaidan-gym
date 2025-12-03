@@ -86,10 +86,10 @@
       if (j.ok){
         window.location.href = '/dashboard';
       } else {
-        alert('Google sign-in failed: ' + (j.error || 'unknown'));
+        showToast('Google sign-in failed: ' + (j.error || 'unknown'), 'danger');
       }
     } catch(e){
-      alert('Google sign-in error');
+      showToast('Google sign-in error', 'danger');
     }
   }
 </script>
@@ -160,6 +160,31 @@
     </div>
   </div>
 
+  <!-- Toast Notification Container -->
+  <div id="toastArea" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+  
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    // Toast notification function
+    function showToast(message, type) {
+      try {
+        const area = document.getElementById('toastArea');
+        const level = (type || 'success').toLowerCase();
+        const cls = level === 'success' ? 'text-bg-success' : level === 'warning' ? 'text-bg-warning' : level === 'info' ? 'text-bg-info' : 'text-bg-danger';
+        const el = document.createElement('div');
+        el.className = `toast align-items-center ${cls} border-0`;
+        el.setAttribute('role', 'alert');
+        el.setAttribute('aria-live', 'assertive');
+        el.setAttribute('aria-atomic', 'true');
+        el.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+        area.appendChild(el);
+        const t = new bootstrap.Toast(el, { delay: 3500 });
+        t.show();
+        el.addEventListener('hidden.bs.toast', () => el.remove());
+      } catch (e) {
+        alert(message);
+      }
+    }
+  </script>
 </body>
 </html>

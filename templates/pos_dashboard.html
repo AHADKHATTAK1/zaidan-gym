@@ -451,7 +451,7 @@
 
       async function checkout() {
         if (!cart.length) {
-          alert('Cart is empty');
+          showToast('Cart is empty', 'warning');
           return;
         }
         const payload = {
@@ -466,7 +466,7 @@
           cart = [];
           saveCart();
           renderCart();
-          alert('Offline — order queued for sync.');
+          showToast('Offline — order queued for sync', 'info');
           return;
         }
         const res = await fetch('/api/checkout', {
@@ -481,7 +481,7 @@
           renderCart();
           window.open(`/pos/receipt/${data.sale.id}`, '_blank');
         } else {
-          alert(data.error || 'Checkout failed');
+          showToast(data.error || 'Checkout failed', 'danger');
         }
       }
 
@@ -495,7 +495,7 @@
       async function syncOfflineOrders() {
         const list = JSON.parse(localStorage.getItem('offlineOrders') || '[]');
         if (!list.length) {
-          alert('No offline orders to sync');
+          showToast('No offline orders to sync', 'info');
           return;
         }
         const res = await fetch('/api/offline-sync', {
@@ -507,9 +507,9 @@
         if (data.ok) {
           localStorage.removeItem('offlineOrders');
           updateOfflineBadge();
-          alert('Offline orders synced');
+          showToast('Offline orders synced successfully', 'success');
         } else {
-          alert('Sync failed');
+          showToast('Sync failed', 'danger');
         }
       }
 
@@ -569,7 +569,7 @@
       document.getElementById('importBtn').addEventListener('click', async () => {
         const file = document.getElementById('importFile').files[0];
         if (!file) {
-          alert('Choose a file first');
+          showToast('Please choose a file first', 'warning');
           return;
         }
         const fd = new FormData();
@@ -577,10 +577,10 @@
         const res = await fetch('/api/products/import', { method: 'POST', body: fd });
         const data = await res.json();
         if (data.ok) {
-          alert(`Imported ${data.created} products`);
+          showToast(`Imported ${data.created} products successfully`, 'success');
           fetchProducts();
         } else {
-          alert(data.error || 'Import failed');
+          showToast(data.error || 'Import failed', 'danger');
         }
       });
 
@@ -615,6 +615,32 @@
       loadTheme();
       fetchProducts();
       loadOfflineOrdersBadge();
+    </script>
+    
+    <!-- Toast Notification Container -->
+    <div id="toastArea" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+    
+    <script>
+      // Toast notification function
+      function showToast(message, type) {
+        try {
+          const area = document.getElementById('toastArea');
+          const level = (type || 'success').toLowerCase();
+          const cls = level === 'success' ? 'text-bg-success' : level === 'warning' ? 'text-bg-warning' : level === 'info' ? 'text-bg-info' : 'text-bg-danger';
+          const el = document.createElement('div');
+          el.className = `toast align-items-center ${cls} border-0`;
+          el.setAttribute('role', 'alert');
+          el.setAttribute('aria-live', 'assertive');
+          el.setAttribute('aria-atomic', 'true');
+          el.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+          area.appendChild(el);
+          const t = new bootstrap.Toast(el, { delay: 3500 });
+          t.show();
+          el.addEventListener('hidden.bs.toast', () => el.remove());
+        } catch (e) {
+          alert(message);
+        }
+      }
     </script>
   </body>
 </html>

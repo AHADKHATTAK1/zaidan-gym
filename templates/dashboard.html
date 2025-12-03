@@ -1091,8 +1091,8 @@
               });
               const data = await res.json();
               if (data.ok) {
-                alert("Saved");
-                location.reload();
+                showToast("Settings saved successfully", "success");
+                setTimeout(() => location.reload(), 1000);
               } else {
                 alert("Failed: " + (data.error || "unknown"));
               }
@@ -1111,7 +1111,7 @@
             async function uploadLogo() {
               const f = document.getElementById("logoFile").files[0];
               if (!f) {
-                alert("Select a logo file");
+                showToast("Please select a logo file", "warning");
                 return;
               }
               const fd = new FormData();
@@ -1122,8 +1122,8 @@
               });
               const data = await res.json();
               if (data.ok) {
-                alert("Logo uploaded");
-                location.reload();
+                showToast("Logo uploaded successfully", "success");
+                setTimeout(() => location.reload(), 1000);
               } else {
                 alert("Upload failed: " + (data.error || "unknown"));
               }
@@ -1132,7 +1132,7 @@
               const res = await fetch("/admin/backup/email", { method: "POST" });
               const data = await res.json();
               if (data.ok) {
-                alert("Backup email sent");
+                showToast("Backup email sent successfully", "success");
               } else {
                 alert("Failed: " + (data.error || "unknown error"));
               }
@@ -1144,9 +1144,12 @@
               if (data.ok) {
                 const link =
                   data.file?.webViewLink || data.file?.webContentLink || "";
-                alert("Backup uploaded to Drive" + (link ? `\n${link}` : ""));
+                showToast("Backup uploaded to Drive successfully" + (link ? " - Link copied to clipboard" : ""), "success");
+                if (link) {
+                  try { navigator.clipboard.writeText(link); } catch (e) {}
+                }
               } else {
-                alert("Drive backup failed: " + (data.error || "unknown error"));
+                showToast("Drive backup failed: " + (data.error || "unknown error"), "danger");
               }
             }
             // Theme toggle
@@ -1174,8 +1177,8 @@
                 body: JSON.stringify({ to, message }),
               });
               const data = await res.json();
-              if (data.ok) alert("Sent");
-              else alert("Failed: " + (data.error || "unknown"));
+              if (data.ok) showToast("WhatsApp test message sent", "success");
+              else showToast("Failed: " + (data.error || "unknown"), "danger");
             }
 
             async function loadWaStatus() {
@@ -1487,7 +1490,7 @@
 
             function exportMonthlyCSV() {
               if (!window.currentMonthlyData) {
-                alert('Please load monthly details first.');
+                showToast('Please load monthly details first.', 'warning');
                 return;
               }
               
@@ -1519,7 +1522,7 @@
             function printMonthlyDetails() {
               const resultsDiv = document.getElementById('monthlyDetailsResults');
               if (!resultsDiv || !resultsDiv.innerHTML.includes('Payment Summary')) {
-                alert('Please load monthly details first.');
+                showToast('Please load monthly details first.', 'warning');
                 return;
               }
               

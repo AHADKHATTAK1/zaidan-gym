@@ -248,8 +248,9 @@
         if (data.ok) {
           products = products.filter((p) => p.id !== id);
           renderProducts();
+          showToast('Product deleted successfully', 'success');
         } else {
-          alert(data.error || 'Delete failed');
+          showToast(data.error || 'Delete failed', 'danger');
         }
       }
 
@@ -286,8 +287,9 @@
           products = products.map((p) => (p.id === Number(id) ? data.product : p));
           renderProducts();
           editModal.hide();
+          showToast('Product updated successfully', 'success');
         } else {
-          alert(data.error || 'Update failed');
+          showToast(data.error || 'Update failed', 'danger');
         }
       });
 
@@ -305,8 +307,9 @@
           products.unshift(data.product);
           form.reset();
           renderProducts();
+          showToast('Product added successfully', 'success');
         } else {
-          alert(data.error || 'Failed to add product');
+          showToast(data.error || 'Failed to add product', 'danger');
         }
       });
 
@@ -315,6 +318,32 @@
       priceFilter.addEventListener('input', renderProducts);
 
       renderProducts();
+    </script>
+    
+    <!-- Toast Notification Container -->
+    <div id="toastArea" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
+    
+    <script>
+      // Toast notification function
+      function showToast(message, type) {
+        try {
+          const area = document.getElementById('toastArea');
+          const level = (type || 'success').toLowerCase();
+          const cls = level === 'success' ? 'text-bg-success' : level === 'warning' ? 'text-bg-warning' : level === 'info' ? 'text-bg-info' : 'text-bg-danger';
+          const el = document.createElement('div');
+          el.className = `toast align-items-center ${cls} border-0`;
+          el.setAttribute('role', 'alert');
+          el.setAttribute('aria-live', 'assertive');
+          el.setAttribute('aria-atomic', 'true');
+          el.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+          area.appendChild(el);
+          const t = new bootstrap.Toast(el, { delay: 3500 });
+          t.show();
+          el.addEventListener('hidden.bs.toast', () => el.remove());
+        } catch (e) {
+          alert(message);
+        }
+      }
     </script>
   </body>
 </html>

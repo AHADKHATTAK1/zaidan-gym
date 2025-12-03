@@ -90,19 +90,42 @@
         </div>
       </div>
     </div>
+    <!-- Toast Notification Container -->
+    <div id="toastArea" class="toast-container position-fixed bottom-0 end-0 p-3"></div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"></script>
     <script>
+      // Toast notification function
+      function showToast(message, type) {
+        try {
+          const area = document.getElementById('toastArea');
+          const level = (type || 'success').toLowerCase();
+          const cls = level === 'success' ? 'text-bg-success' : level === 'warning' ? 'text-bg-warning' : level === 'info' ? 'text-bg-info' : 'text-bg-danger';
+          const el = document.createElement('div');
+          el.className = `toast align-items-center ${cls} border-0`;
+          el.setAttribute('role', 'alert');
+          el.setAttribute('aria-live', 'assertive');
+          el.setAttribute('aria-atomic', 'true');
+          el.innerHTML = `<div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div>`;
+          area.appendChild(el);
+          const t = new bootstrap.Toast(el, { delay: 3500 });
+          t.show();
+          el.addEventListener('hidden.bs.toast', () => el.remove());
+        } catch (e) {
+          alert(message);
+        }
+      }
+      
       async function emailBackup() {
         try {
           const res = await fetch('/admin/backup/email', { method: 'POST' });
           let data = null; try { data = await res.json(); } catch {}
           if (res.ok && data && data.ok) {
-            alert('Backup email sent');
+            showToast('Backup email sent successfully', 'success');
           } else {
-            alert('Email backup failed: ' + (data && data.error ? data.error : `HTTP ${res.status}`));
+            showToast('Email backup failed: ' + (data && data.error ? data.error : `HTTP ${res.status}`), 'danger');
           }
         } catch(e) {
-          alert('Email backup error: ' + (e && e.message ? e.message : e));
+          showToast('Email backup error: ' + (e && e.message ? e.message : e), 'danger');
         }
       }
       async function driveBackup() {
@@ -111,12 +134,15 @@
           let data = null; try { data = await res.json(); } catch {}
           if (res.ok && data && data.ok) {
             const link = data.file?.webViewLink || data.file?.webContentLink || '';
-            alert('Backup uploaded to Drive' + (link ? `\n${link}` : ''));
+            showToast('Backup uploaded to Drive' + (link ? ' - Link copied to clipboard' : ''), 'success');
+            if (link) {
+              try { navigator.clipboard.writeText(link); } catch (e) {}
+            }
           } else {
-            alert('Drive backup failed: ' + (data && data.error ? data.error : `HTTP ${res.status}`));
+            showToast('Drive backup failed: ' + (data && data.error ? data.error : `HTTP ${res.status}`), 'danger');
           }
         } catch(e) {
-          alert('Drive backup error: ' + (e && e.message ? e.message : e));
+          showToast('Drive backup error: ' + (e && e.message ? e.message : e), 'danger');
         }
       }
       function downloadBackup(){

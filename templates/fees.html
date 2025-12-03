@@ -400,9 +400,9 @@
         });
         const data = await res.json();
         if (data.ok) {
-          alert(`Reminders sent: ${data.sent}, failed: ${data.failed}`);
+          showToast(`Reminders sent: ${data.sent} success, ${data.failed} failed`, "success");
         } else {
-          alert("Failed: " + (data.error || "unknown error"));
+          showToast("Failed: " + (data.error || "unknown error"), "danger");
         }
       }
       async function remindSingle(memberId) {
@@ -413,9 +413,9 @@
         });
         const data = await res.json();
         if (data.ok) {
-          alert("Reminder sent");
+          showToast("Reminder sent successfully", "success");
         } else {
-          alert("Failed: " + (data.error || "error"));
+          showToast("Failed: " + (data.error || "error"), "danger");
         }
       }
       setDefaults();
@@ -435,8 +435,8 @@
       // Register Service Worker
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/static/service-worker.js')
-          .then(reg => console.log('SW registered'))
-          .catch(err => console.log('SW failed:', err));
+          .then(reg => { /* SW registered */ })
+          .catch(err => { /* SW registration failed */ });
       }
 
       // Payment Modal Functions

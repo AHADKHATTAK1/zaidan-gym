@@ -18,10 +18,10 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
-        console.log('Cache opened');
+        // Cache opened successfully
         return cache.addAll(urlsToCache.map(url => new Request(url, {cache: 'reload'})));
       })
-      .catch(err => console.log('Cache error:', err))
+      .catch(err => { /* Cache error */ })
   );
 });
 
