@@ -369,11 +369,17 @@ class OAuthAccount(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class PaymentTransaction(db.Model):
+    __tablename__ = 'payment_transaction'
+    __table_args__ = (
+        db.Index('idx_payment_tx_member_year_month', 'member_id', 'year', 'month'),
+        db.Index('idx_payment_tx_created_at', 'created_at'),
+    )
+    
     id = db.Column(db.Integer, primary_key=True)
-    member_id = db.Column(db.Integer, db.ForeignKey('member.id'), nullable=False)
+    member_id = db.Column(db.Integer, db.ForeignKey('member.id'), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
     plan_type = db.Column(db.String(20), nullable=False)
-    year = db.Column(db.Integer, nullable=False)
+    year = db.Column(db.Integer, nullable=False, index=True)
     month = db.Column(db.Integer, nullable=True)
     amount = db.Column(db.Float, nullable=True)
     method = db.Column(db.String(50), nullable=True)
