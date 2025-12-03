@@ -2084,10 +2084,10 @@ def api_payment_pay_now():
         member_id = int(payload.get('member_id') or 0)
     except Exception:
         return jsonify({'ok': False, 'error': 'member_id required'}), 400
-    year = int(payload.get('year') or datetime.now().year)
-    
     # Handle month - could be int or string like "2025-12"
     month_val = payload.get('month')
+    year_val = payload.get('year')
+    
     if month_val:
         if isinstance(month_val, str) and '-' in month_val:
             # Parse "YYYY-MM" format
@@ -2097,10 +2097,29 @@ def api_payment_pay_now():
                 month = int(parts[1])
             else:
                 month = int(month_val)
+                year = int(year_val) if year_val else datetime.now().year
         else:
             month = int(month_val)
+            year = int(year_val) if year_val else datetime.now().year
     else:
-        month = datetime.now().month
+        # If no month specified, find the oldest unpaid month starting from admission date
+        temp_member = db.session.get(Member, member_id)
+        if temp_member and temp_member.admission_date:
+            oldest_unpaid = Payment.query.filter_by(
+                member_id=member_id, 
+                status='Unpaid'
+            ).order_by(Payment.year.asc(), Payment.month.asc()).first()
+            
+            if oldest_unpaid:
+                year = oldest_unpaid.year
+                month = oldest_unpaid.month
+            else:
+                # No unpaid found, use current month
+                year = datetime.now().year
+                month = datetime.now().month
+        else:
+            year = datetime.now().year
+            month = datetime.now().month
     
     method = (payload.get('method') or 'cash').strip()
 
