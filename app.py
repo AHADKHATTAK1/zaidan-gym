@@ -338,6 +338,16 @@ class Payment(db.Model):
     month = db.Column(db.Integer, nullable=False)  # 1-12
     status = db.Column(db.String(20), nullable=False)  # Paid/Unpaid/N/A
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'member_id': self.member_id,
+            'year': self.year,
+            'month': self.month,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
 
 # Duplicate removed: to_dict
 class User(db.Model):
@@ -2043,21 +2053,21 @@ def member_payment_history(member_id):
             'id': member.id,
             'name': member.name,
             'phone': member.phone,
-            'email': member.email,
+            'email': member.email or '',
             # 'cnic': member.cnic,  # Removed because attribute does not exist
-            'address': member.address,
-            'gender': member.gender,
-            'date_of_birth': member.date_of_birth.strftime('%Y-%m-%d') if member.date_of_birth else None,
+            # 'address': member.address,  # Removed because attribute does not exist
+            # 'gender': member.gender,  # Removed because attribute does not exist
+            # 'date_of_birth': member.date_of_birth.strftime('%Y-%m-%d') if member.date_of_birth else None,  # Removed
             'admission_date': member.admission_date.strftime('%Y-%m-%d') if member.admission_date else None,
-            'monthly_price': float(member.monthly_price) if member.monthly_price else 0,
+            'monthly_price': float(member.monthly_fee) if member.monthly_fee else 0,
             'referred_by': member.referred_by,
-            'is_active': member.is_active,
-            'notes': member.notes
+            'is_active': getattr(member, 'is_active', True),
+            # 'notes': member.notes  # Removed because attribute does not exist
         },
         'last_paid_month': last_paid,
         'months_unpaid': months_unpaid,
         'payments': payment_list,
-        'currency': member.currency or 'PKR'
+        'currency': 'PKR'
     })
 
 @app.route('/api/payment/pay-now', methods=['POST'])
@@ -2069,7 +2079,23 @@ def api_payment_pay_now():
     except Exception:
         return jsonify({'ok': False, 'error': 'member_id required'}), 400
     year = int(payload.get('year') or datetime.now().year)
-    month = int(payload.get('month') or datetime.now().month)
+    
+    # Handle month - could be int or string like "2025-12"
+    month_val = payload.get('month')
+    if month_val:
+        if isinstance(month_val, str) and '-' in month_val:
+            # Parse "YYYY-MM" format
+            parts = month_val.split('-')
+            if len(parts) == 2:
+                year = int(parts[0])
+                month = int(parts[1])
+            else:
+                month = int(month_val)
+        else:
+            month = int(month_val)
+    else:
+        month = datetime.now().month
+    
     method = (payload.get('method') or 'cash').strip()
 
     member = db.session.get(Member, member_id)
