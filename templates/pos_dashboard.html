@@ -119,6 +119,28 @@
       .theme-panel.show {
         display: block;
       }
+      .color-btn-green {
+        background: #16a34a !important;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+      }
+      .color-btn-blue {
+        background: #0ea5e9 !important;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+      }
+      .color-btn-rose {
+        background: #f43f5e !important;
+        width: 40px;
+        height: 40px;
+        border-radius: 8px;
+      }
+      .mobile-cart-scrollable {
+        max-height: 35vh;
+        overflow-y: auto;
+      }
     </style>
   </head>
   <body>
@@ -172,6 +194,7 @@
               id="importFile"
               class="form-control"
               accept=".csv,.xlsx,.xls"
+              aria-label="Import products file"
             />
             <button class="btn btn-primary-green" id="importBtn">
               <i class="bi bi-cloud-upload"></i> Upload
@@ -229,6 +252,8 @@
                   id="taxInput"
                   class="form-control form-control-sm w-50 text-end"
                   value="0"
+                  aria-label="Tax amount"
+                  title="Tax amount"
                 />
               </div>
               <div class="d-flex justify-content-between">
@@ -238,6 +263,8 @@
                   id="discountInput"
                   class="form-control form-control-sm w-50 text-end"
                   value="0"
+                  aria-label="Discount amount"
+                  title="Discount amount"
                 />
               </div>
               <div class="d-flex justify-content-between fs-5 mt-2">
@@ -251,6 +278,7 @@
               <select
                 class="form-select form-select-sm mt-2"
                 id="paymentMethod"
+                aria-label="Payment method"
               >
                 <option value="cash">Cash</option>
                 <option value="card">Card</option>
@@ -270,13 +298,12 @@
       <div id="mobileCartDrawer">
         <div class="d-flex justify-content-between align-items-center mb-2">
           <h6 class="text-success mb-0">Cart</h6>
-          <button class="btn btn-sm btn-outline-light" id="closeDrawer">
+          <button class="btn btn-sm btn-outline-light" id="closeDrawer" aria-label="Close cart drawer" title="Close">
             <i class="bi bi-x"></i>
           </button>
         </div>
         <div
-          class="table-responsive"
-          style="max-height: 35vh; overflow-y: auto"
+          class="table-responsive mobile-cart-scrollable"
         >
           <table
             class="table table-dark table-sm align-middle"
@@ -295,7 +322,7 @@
           <div id="mobileTotal">0</div>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-dark" id="openDrawer">
+          <button class="btn btn-dark" id="openDrawer" aria-label="Open cart" title="View cart">
             <i class="bi bi-bag"></i>
           </button>
           <button class="btn btn-light" id="mobileCheckoutBtn">Checkout</button>
@@ -307,7 +334,7 @@
       <h6>Theme Customization</h6>
       <div class="mb-2">
         <label class="form-label">Mode</label>
-        <select id="themeMode" class="form-select form-select-sm">
+        <select id="themeMode" class="form-select form-select-sm" aria-label="Theme mode selection">
           <option value="dark">Dark</option>
           <option value="light">Light</option>
         </select>
@@ -316,19 +343,22 @@
         <label class="form-label">Primary Accent</label>
         <div class="d-flex gap-2">
           <button
-            class="btn btn-sm"
+            type="button"
+            class="btn btn-sm color-btn-green"
             data-color="#16a34a"
-            style="background: #16a34a"
+            aria-label="Green theme"
           ></button>
           <button
-            class="btn btn-sm"
+            type="button"
+            class="btn btn-sm color-btn-blue"
             data-color="#0ea5e9"
-            style="background: #0ea5e9"
+            aria-label="Blue theme"
           ></button>
           <button
-            class="btn btn-sm"
+            type="button"
+            class="btn btn-sm color-btn-rose"
             data-color="#f43f5e"
-            style="background: #f43f5e"
+            aria-label="Rose theme"
           ></button>
         </div>
       </div>
