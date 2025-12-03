@@ -2325,7 +2325,7 @@
                       if (!admissionPaid) {
                         btn = '<button class="btn btn-sm btn-outline-success ms-3" onclick="markFeePaid(' + memberId + ',' + admissionMonth.month + ',' + admissionMonth.year + ',' + '\'Paid\'' + ')">Mark Paid</button>';
                       }
-                      admissionStatusDiv.innerHTML = '<span class="badge ' + badgeClass + ' fs-5 px-4 py-2">Admission Month: ' + admissionMonth.month_name + ' ' + admissionMonth.year + ' - ' + badgeText + '</span>' + remainderTag + btn;
+                      admissionStatusDiv.innerHTML = '<span class="badge ' + badgeClass + ' fs-5 px-4 py-2">Admission Month: ' + admissionMonth.month_name + ' ' + admissionMonth.year + ' - ' + badgeText + '</span>' + remainderTag + '<span class="badge bg-info text-dark ms-2">Admission month</span>' + btn;
                     } else {
                       admissionStatusDiv.innerHTML = '';
                     }
@@ -2335,10 +2335,53 @@
                       var textClass = 'text-light';
                       if (p.status === 'Paid') { badgeClass = 'bg-success'; textClass = 'text-white'; }
                       else if (p.status === 'Unpaid') { badgeClass = 'bg-danger'; textClass = 'text-white'; }
-                      html += '<div class="list-group-item list-group-item-action bg-dark border-secondary py-3">';
+                      // Compute summary and next-due before rendering rows (first loop)
+                      // We'll compute only once and inject a compact summary bar
+                      if (i === 0) {
+                        var paidCount = 0, unpaidCount = 0;
+                        var nextDue = null;
+                        for (var j = 0; j < data.payments.length; j++) {
+                          var pp = data.payments[j];
+                          if (pp.status === 'Paid') paidCount++; else if (pp.status === 'Unpaid') unpaidCount++;
+                          if (!nextDue && pp.status === 'Unpaid') nextDue = new Date(pp.year, pp.month - 1, 1);
+                        }
+                        var nextDueStr = nextDue ? nextDue.toLocaleString(undefined, { month: 'short', year: 'numeric' }) : '-';
+                        var summaryBar = ''+
+                          '<div class="alert alert-secondary py-2 px-3 d-flex align-items-center gap-3 mb-3">'+
+                          '<div><strong>Summary:</strong> '+
+                          '<span>Paid months: '+paidCount+'</span>'+ 
+                          '<span class="ms-2">Unpaid: '+unpaidCount+'</span>'+ 
+                          '<span class="ms-2">Next Due: '+nextDueStr+'</span>'+ 
+                          '</div></div>';
+                        // If a dedicated container exists, use it; otherwise prepend in timeline
+                        var summaryDiv = document.getElementById('memberPaymentsSummary');
+                        if (summaryDiv) { summaryDiv.innerHTML = summaryBar; summaryDiv.classList.remove('d-none'); }
+                        else { html += summaryBar; }
+                      }
+                      var isAdmission = false;
+                      if (admissionMonth && p.month === admissionMonth.month && p.year === admissionMonth.year) {
+                        isAdmission = true;
+                      }
+                      html += '<div class="list-group-item list-group-item-action '+ (isAdmission ? 'border-info' : 'border-secondary') +' '+ (isAdmission ? 'bg-dark' : 'bg-dark') +' py-3">';
                       html += '<div class="d-flex w-100 justify-content-between align-items-center">';
                       html += '<h6 class="mb-1">' + p.month_name + ' ' + p.year + '</h6>';
+                      // Add "Next Due" chip on first unpaid month
+                      var addNextDueChip = false;
+                      if (p.status === 'Unpaid') {
+                        // Determine if this is the first unpaid
+                        var firstUnpaidIdx = -1;
+                        for (var k = 0; k < data.payments.length; k++) {
+                          if (data.payments[k].status === 'Unpaid') { firstUnpaidIdx = k; break; }
+                        }
+                        if (firstUnpaidIdx === i) addNextDueChip = true;
+                      }
                       html += '<span class="badge ' + badgeClass + ' ' + textClass + ' fs-5 px-4 py-2">' + p.status + '</span>';
+                      if (isAdmission) {
+                        html += '<span class="badge bg-info text-dark ms-2">Admission month</span>';
+                      }
+                      if (addNextDueChip) {
+                        html += '<span class="badge bg-warning text-dark ms-2">Next Due</span>';
+                      }
                       html += '<button class="btn btn-sm ms-3 ' + (p.status === 'Paid' ? 'btn-outline-danger' : 'btn-outline-success') + '" onclick="markFeePaid(' + memberId + ',' + p.month + ',' + p.year + ',' + (p.status === 'Paid' ? '\'Unpaid\'' : '\'Paid\'') + ')">' + (p.status === 'Paid' ? 'Mark Unpaid' : 'Mark Paid') + '</button>';
                       html += '</div>';
                       html += '<p class="mb-1">Amount: <strong>' + (p.amount ? p.amount.toLocaleString() : '-') + ' ' + (data.currency || 'PKR') + '</strong></p>';
