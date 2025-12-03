@@ -2568,7 +2568,12 @@ def add_member():
     db.session.commit()
     # initialize payment rows for the admission year
     for month in range(1,13):
-        status = "N/A" if datetime(admission_date.year, month, 1).date() < admission_date else "Unpaid"
+        if datetime(admission_date.year, month, 1).date() < admission_date:
+            status = "N/A"
+        elif month == admission_date.month:
+            status = "Paid"  # Admission month is automatically marked as paid
+        else:
+            status = "Unpaid"
         p = Payment(member_id=m.id, year=admission_date.year, month=month, status=status)
         db.session.add(p)
     db.session.commit()
