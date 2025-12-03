@@ -2436,8 +2436,11 @@
                       }
                       html += '<button class="btn btn-sm ms-3 ' + (p.status === 'Paid' ? 'btn-outline-danger' : 'btn-outline-success') + '" onclick="markFeePaid(' + memberId + ',' + p.month + ',' + p.year + ',' + (p.status === 'Paid' ? '\'Unpaid\'' : '\'Paid\'') + ')">' + (p.status === 'Paid' ? 'Mark Unpaid' : 'Mark Paid') + '</button>';
                       html += '</div>';
-                      html += '<p class="mb-1">Amount: <strong>' + (p.amount ? p.amount.toLocaleString() : '-') + ' ' + (data.currency || 'PKR') + '</strong></p>';
-                      if (p.paid_date) html += '<small class="text-muted">Paid on: ' + p.paid_date + '</small>';
+                      // Only show amount and date if payment has been processed (amount exists)
+                      if (p.amount) {
+                        html += '<p class="mb-1">Amount: <strong>' + p.amount.toLocaleString() + ' ' + (data.currency || 'PKR') + '</strong></p>';
+                        if (p.paid_date) html += '<small class="text-muted">Paid on: ' + p.paid_date + '</small>';
+                      }
                       html += '</div>';
                     }
                     timeline.innerHTML = html;
