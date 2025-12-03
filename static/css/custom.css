@@ -8,3 +8,6 @@
 
 /* Max height utilities */
 .max-h-400 { max-height: 400px; }
+
+/* Toast notifications */
+.toast-container { z-index: 9999; }
